@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "FondoJusto",
+    "slug": "fondojusto",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#f7f4ee"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.fondojusto.app"
+    },
+    "web": {}
+  }
+}
