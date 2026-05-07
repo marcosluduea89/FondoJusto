@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AppData, Expense, Income, MonthlyConfig, MonthState } from "../models";
+import { AppData, Expense, Income, MonthlyConfig, MonthState, PersonId } from "../models";
 import { closeMonth } from "../services/finance";
 import { localRepository } from "../storage/localRepository";
 import { getCurrentMonthKey } from "../utils/dates";
@@ -15,6 +15,8 @@ interface UseAppDataResult {
   addExpense: (expense: Expense) => Promise<void>;
   updateExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (expenseId: string) => Promise<void>;
+  updatePersonName: (personId: PersonId, name: string) => Promise<void>;
+  updatePersonNames: (names: Partial<Record<PersonId, string>>) => Promise<void>;
   saveMonthlyConfig: (config: MonthlyConfig) => Promise<void>;
   performMonthlyClose: (month: string) => Promise<void>;
   reopenMonth: (month: string) => Promise<void>;
@@ -101,6 +103,35 @@ export function useAppData(): UseAppDataResult {
     [data, persist]
   );
 
+  const updatePersonName = useCallback(
+    async (personId: PersonId, name: string) => {
+      if (!data) return;
+
+      await persist({
+        ...data,
+        people: data.people.map((person) =>
+          person.id === personId ? { ...person, name: name.trim() || person.name } : person
+        )
+      });
+    },
+    [data, persist]
+  );
+
+  const updatePersonNames = useCallback(
+    async (names: Partial<Record<PersonId, string>>) => {
+      if (!data) return;
+
+      await persist({
+        ...data,
+        people: data.people.map((person) => ({
+          ...person,
+          name: names[person.id]?.trim() || person.name
+        }))
+      });
+    },
+    [data, persist]
+  );
+
   const saveMonthlyConfig = useCallback(
     async (config: MonthlyConfig) => {
       if (!data) return;
@@ -176,6 +207,8 @@ export function useAppData(): UseAppDataResult {
       addExpense,
       updateExpense,
       deleteExpense,
+      updatePersonName,
+      updatePersonNames,
       saveMonthlyConfig,
       performMonthlyClose,
       reopenMonth,
@@ -198,7 +231,9 @@ export function useAppData(): UseAppDataResult {
       saveMonthlyConfig,
       selectedMonth,
       updateExpense,
-      updateIncome
+      updateIncome,
+      updatePersonName,
+      updatePersonNames
     ]
   );
 }

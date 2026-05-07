@@ -24,6 +24,7 @@ export function parseBackupText(text: string): AppData {
   }
 
   return {
+    people: data.people ?? [],
     incomes: data.incomes,
     expenses: data.expenses,
     reimbursements: data.reimbursements,

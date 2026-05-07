@@ -4,6 +4,7 @@ import { CloseMonthScreen } from "../screens/CloseMonthScreen";
 import { ConfigScreen } from "../screens/ConfigScreen";
 import { DashboardScreen } from "../screens/DashboardScreen";
 import { ExpenseScreen } from "../screens/ExpenseScreen";
+import { GraphScreen } from "../screens/GraphScreen";
 import { HistoryScreen } from "../screens/HistoryScreen";
 import { IncomeScreen } from "../screens/IncomeScreen";
 import { MonthlyDetailScreen } from "../screens/MonthlyDetailScreen";
@@ -16,6 +17,7 @@ export type RootTabParamList = {
   Config: undefined;
   Close: undefined;
   Detail: undefined;
+  Graph: undefined;
   Backup: undefined;
   History: undefined;
 };
@@ -40,6 +42,7 @@ export function AppNavigator() {
       <Tab.Screen component={ConfigScreen} name="Config" options={{ title: "Config" }} />
       <Tab.Screen component={CloseMonthScreen} name="Close" options={{ title: "Cierre" }} />
       <Tab.Screen component={MonthlyDetailScreen} name="Detail" options={{ title: "Detalle" }} />
+      <Tab.Screen component={GraphScreen} name="Graph" options={{ title: "Grafica" }} />
       <Tab.Screen component={BackupScreen} name="Backup" options={{ title: "Backup" }} />
       <Tab.Screen component={HistoryScreen} name="History" options={{ title: "Historial" }} />
     </Tab.Navigator>

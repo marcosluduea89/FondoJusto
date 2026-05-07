@@ -7,7 +7,8 @@ import { useAppDataContext } from "../hooks/AppDataContext";
 import { colors } from "../theme/colors";
 import { formatARS } from "../utils/currency";
 import { formatMonthLabel } from "../utils/dates";
-import { categoryLabels, paymentSourceLabels, personLabels } from "../utils/labels";
+import { categoryLabels, paymentSourceLabels } from "../utils/labels";
+import { getPersonName } from "../utils/people";
 
 // Historial basico para revisar cierres, gastos y reintegros sin depender de servidor.
 export function HistoryScreen() {
@@ -42,7 +43,7 @@ export function HistoryScreen() {
           <View key={expense.id} style={styles.item}>
             <Text style={styles.itemTitle}>{expense.description}</Text>
             <Text style={styles.meta}>
-              {expense.month} - {categoryLabels[expense.category]} - {personLabels[expense.paidBy]} -{" "}
+              {expense.month} - {categoryLabels[expense.category]} - {getPersonName(data?.people, expense.paidBy)} -{" "}
               {paymentSourceLabels[expense.paymentSource]}
             </Text>
             <StatRow label="Monto" value={formatARS(expense.amount)} />
@@ -55,7 +56,7 @@ export function HistoryScreen() {
         {data?.reimbursements.map((reimbursement) => (
           <View key={reimbursement.id} style={styles.item}>
             <Text style={styles.itemTitle}>
-              {personLabels[reimbursement.personId]} - {reimbursement.status === "pending" ? "Pendiente" : "Aplicado"}
+              {getPersonName(data?.people, reimbursement.personId)} - {reimbursement.status === "pending" ? "Pendiente" : "Aplicado"}
             </Text>
             <Text style={styles.meta}>
               Origen {reimbursement.sourceMonth} - Aplica {reimbursement.targetMonth}

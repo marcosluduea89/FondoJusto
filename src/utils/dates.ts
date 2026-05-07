@@ -6,12 +6,28 @@ export function getCurrentMonthKey(): string {
   return `${date.getFullYear()}-${month}`;
 }
 
+// Indica si una clave mensual esta despues del mes calendario actual.
+export function isFutureMonth(month: string): boolean {
+  return month > getCurrentMonthKey();
+}
+
+// Calcula el mes anterior en formato YYYY-MM para comparaciones contables directas.
+export function getPreviousMonthKey(month: string): string {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const previousDate = new Date(year, monthNumber - 2, 1);
+  const previousMonth = String(previousDate.getMonth() + 1).padStart(2, "0");
+
+  return `${previousDate.getFullYear()}-${previousMonth}`;
+}
+
 // Calcula el mes siguiente en formato YYYY-MM para programar reintegros.
 export function getNextMonthKey(month: string): string {
   const [year, monthNumber] = month.split("-").map(Number);
   const nextDate = new Date(year, monthNumber, 1);
 
-  return nextDate.toISOString().slice(0, 7);
+  const nextMonth = String(nextDate.getMonth() + 1).padStart(2, "0");
+
+  return `${nextDate.getFullYear()}-${nextMonth}`;
 }
 
 // Fecha ISO simple para guardar altas realizadas desde formularios.

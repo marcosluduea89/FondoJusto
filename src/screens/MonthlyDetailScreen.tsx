@@ -1,12 +1,13 @@
 import { StyleSheet, Text, View } from "react-native";
 import { Card } from "../components/Card";
+import { MonthSelector } from "../components/MonthSelector";
 import { Screen } from "../components/Screen";
 import { StatRow } from "../components/StatRow";
-import { TextInputField } from "../components/TextInputField";
 import { useAppDataContext } from "../hooks/AppDataContext";
 import { colors } from "../theme/colors";
 import { formatARS } from "../utils/currency";
-import { categoryLabels, paymentSourceLabels, personLabels } from "../utils/labels";
+import { categoryLabels, paymentSourceLabels } from "../utils/labels";
+import { getPersonName } from "../utils/people";
 
 // Detalle operativo del mes: muestra movimientos, reintegros y estado en una sola pantalla.
 export function MonthlyDetailScreen() {
@@ -23,7 +24,7 @@ export function MonthlyDetailScreen() {
 
   return (
     <Screen isLoading={isLoading} title="Detalle mensual">
-      <TextInputField label="Mes" onChangeText={setSelectedMonth} placeholder="YYYY-MM" value={selectedMonth} />
+      <MonthSelector label="Mes" onChange={setSelectedMonth} value={selectedMonth} />
 
       <Card>
         <Text style={styles.sectionTitle}>Estado</Text>
@@ -37,7 +38,7 @@ export function MonthlyDetailScreen() {
           incomes.map((income) => (
             <View key={income.id} style={styles.record}>
               <Text style={styles.recordTitle}>{income.description}</Text>
-              <Text style={styles.meta}>{personLabels[income.personId]} - {income.date}</Text>
+              <Text style={styles.meta}>{getPersonName(data?.people, income.personId)} - {income.date}</Text>
               <StatRow label="Monto" value={formatARS(income.amount)} />
             </View>
           ))
@@ -53,7 +54,7 @@ export function MonthlyDetailScreen() {
             <View key={expense.id} style={styles.record}>
               <Text style={styles.recordTitle}>{expense.description}</Text>
               <Text style={styles.meta}>
-                {categoryLabels[expense.category]} - {personLabels[expense.paidBy]} -{" "}
+                {categoryLabels[expense.category]} - {getPersonName(data?.people, expense.paidBy)} -{" "}
                 {paymentSourceLabels[expense.paymentSource]}
               </Text>
               <StatRow label="Monto" value={formatARS(expense.amount)} />
@@ -71,7 +72,7 @@ export function MonthlyDetailScreen() {
           reimbursements.map((reimbursement) => (
             <View key={reimbursement.id} style={styles.record}>
               <Text style={styles.recordTitle}>
-                {personLabels[reimbursement.personId]} - {reimbursement.status}
+                {getPersonName(data?.people, reimbursement.personId)} - {reimbursement.status}
               </Text>
               <Text style={styles.meta}>
                 Origen {reimbursement.sourceMonth} - Aplica {reimbursement.targetMonth}

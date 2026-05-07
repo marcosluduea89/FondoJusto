@@ -1,6 +1,7 @@
 import { Alert, StyleSheet, View } from "react-native";
 import { useMemo, useState } from "react";
 import { Card } from "../components/Card";
+import { MonthSelector } from "../components/MonthSelector";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SegmentedControl } from "../components/SegmentedControl";
@@ -11,7 +12,8 @@ import { EXPENSE_CATEGORIES, Expense, ExpenseCategory, PaymentSource, PersonId }
 import { formatARS, parseAmountInput } from "../utils/currency";
 import { getTodayISODate } from "../utils/dates";
 import { createId } from "../utils/ids";
-import { categoryLabels, paymentSourceLabels, personLabels } from "../utils/labels";
+import { categoryLabels, paymentSourceLabels } from "../utils/labels";
+import { getConfiguredPeople, getPersonName } from "../utils/people";
 import { isValidISODate, isValidMonthKey } from "../utils/validation";
 
 // Formulario para gastos comunes o no comunes, incluyendo pagos desde dinero personal.
@@ -39,6 +41,7 @@ export function ExpenseScreen() {
     () => data?.expenses.filter((expense) => expense.month === selectedMonth) ?? [],
     [data, selectedMonth]
   );
+  const people = getConfiguredPeople(data?.people);
 
   const resetForm = () => {
     setEditingExpenseId(null);
@@ -126,7 +129,7 @@ export function ExpenseScreen() {
   return (
     <Screen isLoading={isLoading} title="Cargar gasto">
       <Card>
-        <TextInputField label="Mes" onChangeText={setSelectedMonth} placeholder="YYYY-MM" value={selectedMonth} />
+        <MonthSelector label="Mes" onChange={setSelectedMonth} value={selectedMonth} />
         <SegmentedControl
           label="Categoria"
           onChange={setCategory}
@@ -138,10 +141,7 @@ export function ExpenseScreen() {
         <SegmentedControl
           label="Pagado por"
           onChange={setPaidBy}
-          options={[
-            { label: "Marcos", value: "marcos" },
-            { label: "Esposa", value: "wife" }
-          ]}
+          options={people.map((person) => ({ label: person.name, value: person.id }))}
           value={paidBy}
         />
         <SegmentedControl
@@ -188,7 +188,7 @@ export function ExpenseScreen() {
           <View key={expense.id} style={styles.record}>
             <StatRow label={expense.description} value={formatARS(expense.amount)} />
             <StatRow label="Categoria" value={categoryLabels[expense.category]} />
-            <StatRow label="Pagado por" value={personLabels[expense.paidBy]} />
+            <StatRow label="Pagado por" value={getPersonName(data?.people, expense.paidBy)} />
             <StatRow label="Fuente" value={paymentSourceLabels[expense.paymentSource]} />
             <PrimaryButton label="Editar" onPress={() => editExpense(expense)} variant="secondary" />
             <PrimaryButton label="Eliminar" onPress={() => removeExpense(expense.id)} variant="danger" />

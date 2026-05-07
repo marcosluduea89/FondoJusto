@@ -1,15 +1,16 @@
 import { Alert, StyleSheet, Text } from "react-native";
 import { useMemo } from "react";
 import { Card } from "../components/Card";
+import { MonthSelector } from "../components/MonthSelector";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { StatRow } from "../components/StatRow";
-import { TextInputField } from "../components/TextInputField";
 import { useAppDataContext } from "../hooks/AppDataContext";
 import { calculateMonthlyCloseSummary, getMonthlyConfig } from "../services/finance";
 import { colors } from "../theme/colors";
 import { formatARS } from "../utils/currency";
 import { isValidMonthKey } from "../utils/validation";
+import { getPersonName } from "../utils/people";
 
 // Cierre mensual: aplica reintegros pendientes, genera nuevos y guarda el resultado historico.
 export function CloseMonthScreen() {
@@ -23,6 +24,8 @@ export function CloseMonthScreen() {
     setSelectedMonth
   } = useAppDataContext();
   const monthStatus = getMonthStatus(selectedMonth);
+  const marcosName = getPersonName(data?.people, "marcos");
+  const wifeName = getPersonName(data?.people, "wife");
 
   const summary = useMemo(() => {
     if (!data) return null;
@@ -63,7 +66,7 @@ export function CloseMonthScreen() {
 
   return (
     <Screen isLoading={isLoading} title="Cierre mensual">
-      <TextInputField label="Mes a cerrar" onChangeText={setSelectedMonth} placeholder="YYYY-MM" value={selectedMonth} />
+      <MonthSelector label="Mes a cerrar" onChange={setSelectedMonth} value={selectedMonth} />
 
       {summary && (
         <Card>
@@ -72,8 +75,8 @@ export function CloseMonthScreen() {
           <StatRow label="Ingresos" value={formatARS(summary.totalIncome)} />
           <StatRow label="Gastos comunes" value={formatARS(summary.totalCommonExpenses)} />
           <StatRow label="Inversion" value={formatARS(summary.investmentAmount)} />
-          <StatRow label="Marcos final" value={formatARS(summary.finalPersonalAmountMarcos)} />
-          <StatRow label="Esposa final" value={formatARS(summary.finalPersonalAmountWife)} />
+          <StatRow label={`${marcosName} final`} value={formatARS(summary.finalPersonalAmountMarcos)} />
+          <StatRow label={`${wifeName} final`} value={formatARS(summary.finalPersonalAmountWife)} />
           <StatRow label="Fondo comun restante" tone="positive" value={formatARS(summary.remainingCommonFund)} />
           <Text style={styles.note}>
             Al cerrar, los reintegros pendientes del mes quedan aplicados y los gastos comunes pagados con dinero

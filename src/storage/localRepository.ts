@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppData } from "../models";
+import { PEOPLE } from "../models/person";
 import { seedData } from "./seedData";
 
 const STORAGE_KEY = "@fondojusto/app-data";
@@ -7,6 +8,7 @@ const STORAGE_KEY = "@fondojusto/app-data";
 function normalizeData(data: AppData): AppData {
   return {
     ...data,
+    people: data.people ?? PEOPLE,
     monthStates: data.monthStates ?? []
   };
 }

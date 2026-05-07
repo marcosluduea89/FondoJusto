@@ -59,8 +59,19 @@ export function getMonthExpenses(expenses: Expense[], month: string): Expense[] 
   return expenses.filter((expense) => expense.month === month);
 }
 
-// Detecta reintegros pendientes que deben aplicarse en el mes actual o quedaron atrasados.
-export function getPendingReimbursementsForMonth(
+// Detecta reintegros pendientes del mes exacto. Se usa al navegar pantallas para no arrastrar
+// el mismo reintegro por meses futuros vacios.
+export function getPendingReimbursementsForExactMonth(
+  reimbursements: Reimbursement[],
+  month: string
+): Reimbursement[] {
+  return reimbursements.filter(
+    (reimbursement) => reimbursement.status === "pending" && reimbursement.targetMonth === month
+  );
+}
+
+// Detecta reintegros pendientes que deben aplicarse en el cierre actual o quedaron atrasados.
+export function getPendingReimbursementsForClose(
   reimbursements: Reimbursement[],
   month: string
 ): Reimbursement[] {
@@ -89,10 +100,27 @@ export function calculateMonthlySummary(
   config: MonthlyConfig,
   month: string
 ): MonthlySummary {
+  const pendingReimbursements = getPendingReimbursementsForExactMonth(reimbursements, month);
+
+  return calculateMonthlySummaryWithReimbursements(
+    incomes,
+    expenses,
+    pendingReimbursements,
+    config,
+    month
+  );
+}
+
+function calculateMonthlySummaryWithReimbursements(
+  incomes: Income[],
+  expenses: Expense[],
+  reimbursementsToApply: Reimbursement[],
+  config: MonthlyConfig,
+  month: string
+): MonthlySummary {
   const monthIncomes = getMonthIncomes(incomes, month);
   const monthExpenses = getMonthExpenses(expenses, month);
   const commonExpenses = monthExpenses.filter((expense) => expense.isCommonExpense);
-  const pendingReimbursements = getPendingReimbursementsForMonth(reimbursements, month);
 
   const totalIncome = sumAmounts(monthIncomes);
   const totalCommonExpenses = sumAmounts(commonExpenses);
@@ -100,10 +128,10 @@ export function calculateMonthlySummary(
   const personalAmountMarcos = totalIncome * (config.personalPercentageMarcos / 100);
   const personalAmountWife = totalIncome * (config.personalPercentageWife / 100);
   const pendingReimbursementsMarcos = sumAmounts(
-    pendingReimbursements.filter((reimbursement) => reimbursement.personId === "marcos")
+    reimbursementsToApply.filter((reimbursement) => reimbursement.personId === "marcos")
   );
   const pendingReimbursementsWife = sumAmounts(
-    pendingReimbursements.filter((reimbursement) => reimbursement.personId === "wife")
+    reimbursementsToApply.filter((reimbursement) => reimbursement.personId === "wife")
   );
   const finalPersonalAmountMarcos = personalAmountMarcos + pendingReimbursementsMarcos;
   const finalPersonalAmountWife = personalAmountWife + pendingReimbursementsWife;
@@ -138,7 +166,7 @@ export function calculateMonthlyCloseSummary(
 ): MonthlySummary {
   const closeReimbursements = getReimbursementsForMonthlyClose(reimbursements, month);
 
-  return calculateMonthlySummary(incomes, expenses, closeReimbursements, config, month);
+  return calculateMonthlySummaryWithReimbursements(incomes, expenses, closeReimbursements, config, month);
 }
 
 // Crea reintegros para gastos comunes pagados desde dinero personal.
@@ -179,7 +207,7 @@ export function closeMonth(data: AppData, month: string): MonthlyCloseResult {
     config,
     month
   );
-  const pendingForMonth = getPendingReimbursementsForMonth(data.reimbursements, month);
+  const pendingForMonth = getPendingReimbursementsForClose(data.reimbursements, month);
   const pendingIds = new Set(pendingForMonth.map((reimbursement) => reimbursement.id));
   const updatedReimbursements = data.reimbursements.map((reimbursement) =>
     pendingIds.has(reimbursement.id)

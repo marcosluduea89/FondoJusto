@@ -1,4 +1,5 @@
 import { AppData } from "../models";
+import { PEOPLE } from "../models/person";
 import { getCurrentMonthKey, getNextMonthKey } from "../utils/dates";
 
 const currentMonth = getCurrentMonthKey();
@@ -6,6 +7,7 @@ const nextMonth = getNextMonthKey(currentMonth);
 
 // Datos de ejemplo para abrir la app y ver todos los calculos funcionando.
 export const seedData: AppData = {
+  people: PEOPLE,
   incomes: [
     {
       id: "income_demo_marcos",

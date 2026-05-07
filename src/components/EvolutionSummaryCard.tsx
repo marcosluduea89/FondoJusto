@@ -1,0 +1,201 @@
+import { useMemo, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { LineChart } from "react-native-gifted-charts";
+import { MonthlyClose } from "../models";
+import { MonthlySummary } from "../services/finance";
+import { colors } from "../theme/colors";
+import { formatARS } from "../utils/currency";
+import { getPreviousMonthKey } from "../utils/dates";
+import { SegmentedControl } from "./SegmentedControl";
+
+type DashboardMetric = "income" | "expenses" | "fund";
+
+interface EvolutionSummaryCardProps {
+  closes: MonthlyClose[];
+  selectedMonth: string;
+  summary: MonthlySummary;
+}
+
+interface MetricConfig {
+  color: string;
+  label: string;
+  getValue: (point: EvolutionPoint) => number;
+}
+
+interface EvolutionPoint {
+  month: string;
+  totalIncome: number;
+  totalCommonExpenses: number;
+  remainingCommonFund: number;
+}
+
+const METRIC_CONFIG: Record<DashboardMetric, MetricConfig> = {
+  income: {
+    color: "#0f7b6c",
+    label: "Ingresos",
+    getValue: (close) => close.totalIncome
+  },
+  expenses: {
+    color: "#b42318",
+    label: "Gastos",
+    getValue: (close) => close.totalCommonExpenses
+  },
+  fund: {
+    color: "#3867d6",
+    label: "Fondo",
+    getValue: (close) => close.remainingCommonFund
+  }
+};
+
+// Tarjeta compacta de inicio para ver una metrica historica sin entrar a la pestana Grafica.
+export function EvolutionSummaryCard({ closes, selectedMonth, summary }: EvolutionSummaryCardProps) {
+  const [metric, setMetric] = useState<DashboardMetric>("income");
+  const metricConfig = METRIC_CONFIG[metric];
+  const selectedPoint = useMemo<EvolutionPoint>(
+    () => ({
+      month: selectedMonth,
+      totalIncome: summary.totalIncome,
+      totalCommonExpenses: summary.totalCommonExpenses,
+      remainingCommonFund: summary.remainingCommonFund
+    }),
+    [selectedMonth, summary]
+  );
+  const previousClose = useMemo(
+    () => closes.find((close) => close.month === getPreviousMonthKey(selectedMonth)),
+    [closes, selectedMonth]
+  );
+  const visibleCloses = useMemo(
+    () => {
+      const previousPoints = closes
+        .filter((close) => close.month < selectedMonth)
+        .slice()
+        .sort((left, right) => left.month.localeCompare(right.month))
+        .slice(-5);
+
+      return [...previousPoints, selectedPoint];
+    },
+    [closes, selectedMonth, selectedPoint]
+  );
+  const currentValue = metricConfig.getValue(selectedPoint);
+  const hasCurrentData =
+    summary.totalIncome > 0 ||
+    summary.totalCommonExpenses > 0 ||
+    summary.investmentAmount > 0 ||
+    summary.pendingReimbursementsMarcos > 0 ||
+    summary.pendingReimbursementsWife > 0;
+  const previousValue = previousClose ? metricConfig.getValue(previousClose) : 0;
+  const difference = currentValue - previousValue;
+  const percentage = previousValue !== 0 ? (difference / Math.abs(previousValue)) * 100 : 0;
+  const maxValue = visibleCloses.reduce(
+    (max, close) => Math.max(max, Math.abs(metricConfig.getValue(close))),
+    0
+  );
+  const lineData = visibleCloses.map((close) => ({
+    label: close.month.slice(5, 7),
+    value: Math.max(0, metricConfig.getValue(close))
+  }));
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>Evolucion</Text>
+        <Text style={styles.metricName}>{metricConfig.label}</Text>
+        <Text style={styles.amount}>{formatARS(currentValue)}</Text>
+        {!hasCurrentData ? (
+          <Text style={styles.empty}>Sin datos para este mes.</Text>
+        ) : previousClose ? (
+          <Text style={[styles.variation, difference >= 0 ? styles.positive : styles.negative]}>
+            {difference >= 0 ? "+" : ""}
+            {formatARS(difference)} ({percentage.toFixed(1)}%) vs cierre anterior
+          </Text>
+        ) : (
+          <Text style={styles.empty}>Sin cierre del mes anterior comparable.</Text>
+        )}
+      </View>
+
+      <SegmentedControl
+        label="Metrica"
+        onChange={setMetric}
+        options={[
+          { label: "Ingresos", value: "income" },
+          { label: "Gastos", value: "expenses" },
+          { label: "Fondo", value: "fund" }
+        ]}
+        value={metric}
+      />
+
+      {lineData.length > 1 ? (
+        <View style={styles.chart}>
+          <LineChart
+            areaChart
+            curved
+            data={lineData}
+            color1={metricConfig.color}
+            dataPointsColor1={metricConfig.color}
+            height={150}
+            hideRules={false}
+            initialSpacing={8}
+            maxValue={maxValue}
+            noOfSections={3}
+            rulesColor={colors.border}
+            spacing={48}
+            thickness={3}
+            width={280}
+            xAxisColor={colors.border}
+            yAxisColor={colors.border}
+            yAxisTextStyle={styles.axisText}
+          />
+        </View>
+      ) : (
+        <Text style={styles.empty}>Todavia no hay suficientes cierres para dibujar la linea.</Text>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  amount: {
+    color: colors.text,
+    fontSize: 32,
+    fontWeight: "900"
+  },
+  axisText: {
+    color: colors.muted,
+    fontSize: 10
+  },
+  chart: {
+    alignItems: "center",
+    overflow: "hidden"
+  },
+  container: {
+    gap: 12
+  },
+  empty: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18
+  },
+  eyebrow: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  header: {
+    gap: 4
+  },
+  metricName: {
+    color: colors.primaryDark,
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  negative: {
+    color: colors.danger
+  },
+  positive: {
+    color: colors.primaryDark
+  },
+  variation: {
+    fontSize: 14,
+    fontWeight: "800"
+  }
+});

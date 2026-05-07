@@ -1,6 +1,7 @@
 import { Alert } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "../components/Card";
+import { MonthSelector } from "../components/MonthSelector";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { TextInputField } from "../components/TextInputField";
@@ -11,7 +12,14 @@ import { isValidMonthKey, validateMonthlyPercentages } from "../utils/validation
 
 // Pantalla para ajustar porcentajes mensuales sin tocar las reglas de calculo.
 export function ConfigScreen() {
-  const { data, isLoading, saveMonthlyConfig, selectedMonth, setSelectedMonth } = useAppDataContext();
+  const {
+    data,
+    isLoading,
+    saveMonthlyConfig,
+    selectedMonth,
+    setSelectedMonth,
+    updatePersonNames
+  } = useAppDataContext();
 
   const config = useMemo(
     () => (data ? getMonthlyConfig(data.monthlyConfigs, selectedMonth) : null),
@@ -20,6 +28,8 @@ export function ConfigScreen() {
   const [investmentPercentage, setInvestmentPercentage] = useState("10");
   const [personalPercentageMarcos, setPersonalPercentageMarcos] = useState("5");
   const [personalPercentageWife, setPersonalPercentageWife] = useState("5");
+  const [marcosName, setMarcosName] = useState("Marcos");
+  const [wifeName, setWifeName] = useState("Esposa");
 
   useEffect(() => {
     if (!config) return;
@@ -28,6 +38,14 @@ export function ConfigScreen() {
     setPersonalPercentageMarcos(String(config.personalPercentageMarcos));
     setPersonalPercentageWife(String(config.personalPercentageWife));
   }, [config]);
+
+  useEffect(() => {
+    const marcos = data?.people.find((person) => person.id === "marcos");
+    const wife = data?.people.find((person) => person.id === "wife");
+
+    setMarcosName(marcos?.name ?? "Marcos");
+    setWifeName(wife?.name ?? "Esposa");
+  }, [data?.people]);
 
   const saveConfig = async () => {
     const nextInvestment = parseAmountInput(investmentPercentage || String(config?.investmentPercentage ?? 0));
@@ -63,10 +81,26 @@ export function ConfigScreen() {
     setPersonalPercentageWife(String(config.personalPercentageWife));
   };
 
+  const savePeople = async () => {
+    if (!marcosName.trim() || !wifeName.trim()) {
+      Alert.alert("Nombre invalido", "Los nombres no pueden quedar vacios.");
+      return;
+    }
+
+    await updatePersonNames({ marcos: marcosName, wife: wifeName });
+    Alert.alert("Personas guardadas", "Los nombres se actualizaron en toda la app.");
+  };
+
   return (
     <Screen isLoading={isLoading} title="Configuracion mensual">
       <Card>
-        <TextInputField label="Mes" onChangeText={setSelectedMonth} placeholder="YYYY-MM" value={selectedMonth} />
+        <TextInputField label="Persona 1" onChangeText={setMarcosName} placeholder="Marcos" value={marcosName} />
+        <TextInputField label="Persona 2" onChangeText={setWifeName} placeholder="Esposa" value={wifeName} />
+        <PrimaryButton label="Guardar personas" onPress={savePeople} />
+      </Card>
+
+      <Card>
+        <MonthSelector label="Mes" onChange={setSelectedMonth} value={selectedMonth} />
         <TextInputField
           keyboardType="numeric"
           label="Porcentaje inversion"
@@ -76,14 +110,14 @@ export function ConfigScreen() {
         />
         <TextInputField
           keyboardType="numeric"
-          label="Porcentaje personal Marcos"
+          label={`Porcentaje personal ${marcosName || "Persona 1"}`}
           onChangeText={setPersonalPercentageMarcos}
           placeholder="5"
           value={personalPercentageMarcos}
         />
         <TextInputField
           keyboardType="numeric"
-          label="Porcentaje personal esposa"
+          label={`Porcentaje personal ${wifeName || "Persona 2"}`}
           onChangeText={setPersonalPercentageWife}
           placeholder="5"
           value={personalPercentageWife}

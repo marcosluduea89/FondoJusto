@@ -1,6 +1,7 @@
 import { Alert, StyleSheet, View } from "react-native";
 import { useMemo, useState } from "react";
 import { Card } from "../components/Card";
+import { MonthSelector } from "../components/MonthSelector";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SegmentedControl } from "../components/SegmentedControl";
@@ -11,7 +12,7 @@ import { Income, PersonId } from "../models";
 import { formatARS, parseAmountInput } from "../utils/currency";
 import { getTodayISODate } from "../utils/dates";
 import { createId } from "../utils/ids";
-import { personLabels } from "../utils/labels";
+import { getConfiguredPeople, getPersonName } from "../utils/people";
 import { isValidISODate, isValidMonthKey } from "../utils/validation";
 
 // Formulario para cargar ingresos de Marcos, esposa u otros conceptos familiares.
@@ -36,6 +37,7 @@ export function IncomeScreen() {
     () => data?.incomes.filter((income) => income.month === selectedMonth) ?? [],
     [data, selectedMonth]
   );
+  const people = getConfiguredPeople(data?.people);
 
   const resetForm = () => {
     setEditingIncomeId(null);
@@ -114,14 +116,11 @@ export function IncomeScreen() {
   return (
     <Screen isLoading={isLoading} title="Cargar ingreso">
       <Card>
-        <TextInputField label="Mes" onChangeText={setSelectedMonth} placeholder="YYYY-MM" value={selectedMonth} />
+        <MonthSelector label="Mes" onChange={setSelectedMonth} value={selectedMonth} />
         <SegmentedControl
           label="Persona"
           onChange={setPersonId}
-          options={[
-            { label: "Marcos", value: "marcos" },
-            { label: "Esposa", value: "wife" }
-          ]}
+          options={people.map((person) => ({ label: person.name, value: person.id }))}
           value={personId}
         />
         <TextInputField label="Descripcion" onChangeText={setDescription} placeholder="Sueldo, extra..." value={description} />
@@ -156,7 +155,7 @@ export function IncomeScreen() {
         />
         {monthIncomes.map((income) => (
           <View key={income.id} style={styles.record}>
-            <StatRow label={`${income.description} (${personLabels[income.personId]})`} value={formatARS(income.amount)} />
+            <StatRow label={`${income.description} (${getPersonName(data?.people, income.personId)})`} value={formatARS(income.amount)} />
             <PrimaryButton label="Editar" onPress={() => editIncome(income)} variant="secondary" />
             <PrimaryButton label="Eliminar" onPress={() => removeIncome(income.id)} variant="danger" />
           </View>
