@@ -16,6 +16,7 @@ export function ConfigScreen() {
     data,
     isLoading,
     saveMonthlyConfig,
+    saveAppSettings,
     selectedMonth,
     setSelectedMonth,
     updatePersonNames
@@ -30,6 +31,7 @@ export function ConfigScreen() {
   const [personalPercentageWife, setPersonalPercentageWife] = useState("5");
   const [marcosName, setMarcosName] = useState("Marcos");
   const [wifeName, setWifeName] = useState("Esposa");
+  const [closeDay, setCloseDay] = useState("5");
 
   useEffect(() => {
     if (!config) return;
@@ -38,6 +40,11 @@ export function ConfigScreen() {
     setPersonalPercentageMarcos(String(config.personalPercentageMarcos));
     setPersonalPercentageWife(String(config.personalPercentageWife));
   }, [config]);
+
+  useEffect(() => {
+    if (!data) return;
+    setCloseDay(String(data.appSettings?.closeDay ?? 5));
+  }, [data?.appSettings, data]);
 
   useEffect(() => {
     const marcos = data?.people.find((person) => person.id === "marcos");
@@ -51,6 +58,7 @@ export function ConfigScreen() {
     const nextInvestment = parseAmountInput(investmentPercentage || String(config?.investmentPercentage ?? 0));
     const nextMarcos = parseAmountInput(personalPercentageMarcos || String(config?.personalPercentageMarcos ?? 0));
     const nextWife = parseAmountInput(personalPercentageWife || String(config?.personalPercentageWife ?? 0));
+    const nextCloseDay = Number(closeDay);
     const validationError = validateMonthlyPercentages(nextInvestment, nextMarcos, nextWife);
 
     if (!isValidMonthKey(selectedMonth)) {
@@ -63,6 +71,11 @@ export function ConfigScreen() {
       return;
     }
 
+    if (!Number.isInteger(nextCloseDay) || nextCloseDay < 1 || nextCloseDay > 31) {
+      Alert.alert("Dia de cierre invalido", "Ingresa un numero entre 1 y 31.");
+      return;
+    }
+
     await saveMonthlyConfig({
       month: selectedMonth,
       investmentPercentage: nextInvestment,
@@ -70,15 +83,21 @@ export function ConfigScreen() {
       personalPercentageWife: nextWife
     });
 
-    Alert.alert("Configuracion guardada", "Los porcentajes se usaran en el dashboard y el cierre.");
+    await saveAppSettings(nextCloseDay);
+
+    Alert.alert(
+      "Configuracion guardada",
+      "Los porcentajes y el dia de cierre se usaran en el dashboard y en el cierre automatico."
+    );
   };
 
   const loadCurrentConfig = () => {
-    if (!config) return;
+    if (!config || !data) return;
 
     setInvestmentPercentage(String(config.investmentPercentage));
     setPersonalPercentageMarcos(String(config.personalPercentageMarcos));
     setPersonalPercentageWife(String(config.personalPercentageWife));
+    setCloseDay(String(data.appSettings?.closeDay ?? 5));
   };
 
   const savePeople = async () => {
@@ -121,6 +140,13 @@ export function ConfigScreen() {
           onChangeText={setPersonalPercentageWife}
           placeholder="5"
           value={personalPercentageWife}
+        />
+        <TextInputField
+          keyboardType="numeric"
+          label="Dia de cierre"
+          onChangeText={setCloseDay}
+          placeholder="5"
+          value={closeDay}
         />
         <PrimaryButton label="Cargar valores guardados" onPress={loadCurrentConfig} variant="secondary" />
         <PrimaryButton label="Guardar configuracion" onPress={saveConfig} />

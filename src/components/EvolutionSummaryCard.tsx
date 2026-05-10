@@ -4,6 +4,7 @@ import { LineChart } from "react-native-gifted-charts";
 import { MonthlyClose } from "../models";
 import { MonthlySummary } from "../services/finance";
 import { colors } from "../theme/colors";
+import { buildYAxisLabels } from "../utils/chart";
 import { formatARS } from "../utils/currency";
 import { getPreviousMonthKey } from "../utils/dates";
 import { SegmentedControl } from "./SegmentedControl";
@@ -90,6 +91,9 @@ export function EvolutionSummaryCard({ closes, selectedMonth, summary }: Evoluti
     (max, close) => Math.max(max, Math.abs(metricConfig.getValue(close))),
     0
   );
+  const chartMaxValue = maxValue > 0 ? maxValue * 1.2 : 1;
+  const chartSections = 3;
+  const yAxisLabels = buildYAxisLabels(chartMaxValue, chartSections);
   const lineData = visibleCloses.map((close) => ({
     label: close.month.slice(5, 7),
     value: Math.max(0, metricConfig.getValue(close))
@@ -110,6 +114,19 @@ export function EvolutionSummaryCard({ closes, selectedMonth, summary }: Evoluti
           </Text>
         ) : (
           <Text style={styles.empty}>Sin cierre del mes anterior comparable.</Text>
+        )}
+        {hasCurrentData && (
+          <View style={styles.availableBox}>
+            <Text style={styles.availableLabel}>Saldo disponible</Text>
+            <Text
+              style={[
+                styles.availableAmount,
+                summary.remainingCommonFund >= 0 ? styles.positive : styles.negative
+              ]}
+            >
+              {formatARS(summary.remainingCommonFund)}
+            </Text>
+          </View>
         )}
       </View>
 
@@ -135,14 +152,20 @@ export function EvolutionSummaryCard({ closes, selectedMonth, summary }: Evoluti
             height={150}
             hideRules={false}
             initialSpacing={8}
-            maxValue={maxValue}
-            noOfSections={3}
+            maxValue={chartMaxValue}
+            mostNegativeValue={0}
+            noOfSections={chartSections}
+            noOfSectionsBelowXAxis={0}
+            overflowTop={18}
             rulesColor={colors.border}
             spacing={48}
             thickness={3}
             width={280}
             xAxisColor={colors.border}
             yAxisColor={colors.border}
+            yAxisLabelTexts={yAxisLabels}
+            yAxisLabelWidth={46}
+            yAxisOffset={0}
             yAxisTextStyle={styles.axisText}
           />
         </View>
@@ -162,6 +185,25 @@ const styles = StyleSheet.create({
   axisText: {
     color: colors.muted,
     fontSize: 10
+  },
+  availableAmount: {
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  availableBox: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 2,
+    marginTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  availableLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800"
   },
   chart: {
     alignItems: "center",

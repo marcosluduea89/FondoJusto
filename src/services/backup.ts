@@ -30,7 +30,8 @@ export function parseBackupText(text: string): AppData {
     reimbursements: data.reimbursements,
     monthlyConfigs: data.monthlyConfigs,
     monthlyCloses: data.monthlyCloses,
-    monthStates: data.monthStates ?? []
+    monthStates: data.monthStates ?? [],
+    appSettings: data.appSettings ?? { closeDay: 5 }
   };
 }
 

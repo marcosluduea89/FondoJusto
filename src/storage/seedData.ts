@@ -103,5 +103,8 @@ export const seedData: AppData = {
       month: currentMonth,
       status: "open"
     }
-  ]
+  ],
+  appSettings: {
+    closeDay: 5
+  }
 };

@@ -9,7 +9,9 @@ import { StatRow } from "../components/StatRow";
 import { useAppDataContext } from "../hooks/AppDataContext";
 import { EXPENSE_CATEGORIES, ExpenseCategory } from "../models";
 import { colors } from "../theme/colors";
+import { buildYAxisLabels } from "../utils/chart";
 import { formatARS } from "../utils/currency";
+import { calculateMonthlySummary, getMonthlyConfig } from "../services/finance";
 import { formatMonthLabel, isFutureMonth } from "../utils/dates";
 import { categoryLabels } from "../utils/labels";
 
@@ -70,21 +72,44 @@ export function GraphScreen() {
   const shouldShowEvolution = graphView === "all" || graphView === "evolution";
   const shouldShowExpenses = graphView === "all" || graphView === "expenses";
 
-  const closes = useMemo(
+  const monthKeys = useMemo(() => {
+    if (!data) return [];
+
+    const months = new Set<string>();
+    data.incomes.forEach((income) => months.add(income.month));
+    data.expenses.forEach((expense) => months.add(expense.month));
+
+    return Array.from(months)
+      .filter((month) => !isFutureMonth(month))
+      .sort((left, right) => left.localeCompare(right));
+  }, [data]);
+
+  const monthlySummaries = useMemo(
     () =>
-      (data?.monthlyCloses ?? [])
-        .filter((close) => !isFutureMonth(close.month))
-        .slice()
-        .sort((left, right) => left.month.localeCompare(right.month)),
-    [data]
+      data
+        ? monthKeys.map((month) => {
+            const config = getMonthlyConfig(data.monthlyConfigs, month);
+            return {
+              month,
+              ...calculateMonthlySummary(
+                data.incomes,
+                data.expenses,
+                data.reimbursements,
+                config,
+                month
+              )
+            };
+          })
+        : [],
+    [data, monthKeys]
   );
 
-  const visibleCloses = useMemo(
+  const visibleSummaries = useMemo(
     () =>
       monthScope === "selected_month"
-        ? closes.filter((close) => close.month === selectedMonth)
-        : closes.slice(-6),
-    [closes, monthScope, selectedMonth]
+        ? monthlySummaries.filter((summary) => summary.month <= selectedMonth)
+        : monthlySummaries.slice(-6),
+    [monthlySummaries, monthScope, selectedMonth]
   );
 
   const categoryTotals = useMemo<CategoryTotal[]>(() => {
@@ -106,40 +131,43 @@ export function GraphScreen() {
 
   const maxCloseValue = useMemo(
     () =>
-      visibleCloses.reduce(
-        (maxValue, close) =>
+      visibleSummaries.reduce(
+        (maxValue, summary) =>
           Math.max(
             maxValue,
-            close.totalIncome,
-            close.totalCommonExpenses,
-            close.investmentAmount,
-            Math.abs(close.remainingCommonFund)
+            summary.totalIncome,
+            summary.totalCommonExpenses,
+            summary.investmentAmount,
+            Math.abs(summary.remainingCommonFund)
           ),
         0
       ),
-    [visibleCloses]
+    [visibleSummaries]
   );
+  const chartMaxValue = maxCloseValue > 0 ? maxCloseValue * 1.2 : 1;
+  const chartSections = 4;
+  const yAxisLabels = buildYAxisLabels(chartMaxValue, chartSections);
   const maxCategoryValue = categoryTotals.reduce((maxValue, item) => Math.max(maxValue, item.total), 0);
-  const periodLabel = monthScope === "all_months" ? "Todos los meses" : selectedMonth;
+  const periodLabel = monthScope === "all_months" ? "Todos los meses" : `Hasta ${selectedMonth}`;
   const incomeLineData = useMemo<LinePoint[]>(
-    () => visibleCloses.map((close) => ({ label: close.month.slice(5, 7), value: close.totalIncome })),
-    [visibleCloses]
+    () => visibleSummaries.map((summary) => ({ label: summary.month.slice(5, 7), value: summary.totalIncome })),
+    [visibleSummaries]
   );
   const expenseLineData = useMemo<LinePoint[]>(
     () =>
-      visibleCloses.map((close) => ({
-        label: close.month.slice(5, 7),
-        value: close.totalCommonExpenses
+      visibleSummaries.map((summary) => ({
+        label: summary.month.slice(5, 7),
+        value: summary.totalCommonExpenses
       })),
-    [visibleCloses]
+    [visibleSummaries]
   );
   const remainingLineData = useMemo<LinePoint[]>(
     () =>
-      visibleCloses.map((close) => ({
-        label: close.month.slice(5, 7),
-        value: Math.max(0, close.remainingCommonFund)
+      visibleSummaries.map((summary) => ({
+        label: summary.month.slice(5, 7),
+        value: Math.max(0, summary.remainingCommonFund)
       })),
-    [visibleCloses]
+    [visibleSummaries]
   );
   const pieData = useMemo(
     () =>
@@ -187,13 +215,13 @@ export function GraphScreen() {
         <Card>
           <Text style={styles.sectionTitle}>Evolucion mensual</Text>
           <Text style={styles.note}>
-            Usa los cierres mensuales guardados. Con todos los meses muestra los ultimos 6 cierres.
+            Para el mes seleccionado, las graficas muestran la evolución del mes hasta ese punto usando datos actuales, sin requerir cierre.
           </Text>
           <StatRow label="Periodo" value={periodLabel} />
 
-          {visibleCloses.length ? (
+          {visibleSummaries.length ? (
             <>
-              {visibleCloses.length > 1 && (
+              {visibleSummaries.length > 1 && (
                 <View style={styles.chartBox}>
                   <LineChart
                     areaChart
@@ -209,14 +237,20 @@ export function GraphScreen() {
                     dataPointsColor3="#3867d6"
                     height={180}
                     initialSpacing={8}
-                    maxValue={maxCloseValue}
-                    noOfSections={4}
+                    maxValue={chartMaxValue}
+                    mostNegativeValue={0}
+                    noOfSections={chartSections}
+                    noOfSectionsBelowXAxis={0}
+                    overflowTop={24}
                     rulesColor={colors.border}
                     spacing={42}
                     thickness={3}
                     width={280}
                     xAxisColor={colors.border}
                     yAxisColor={colors.border}
+                    yAxisLabelTexts={yAxisLabels}
+                    yAxisLabelWidth={46}
+                    yAxisOffset={0}
                     yAxisTextStyle={styles.axisText}
                   />
                   <View style={styles.legendRow}>
@@ -227,23 +261,38 @@ export function GraphScreen() {
                 </View>
               )}
 
-              {visibleCloses.map((close) => (
-                <View key={close.id} style={styles.monthBlock}>
-                  <Text style={styles.monthTitle}>{formatMonthLabel(close.month)}</Text>
-                  <MetricBar color="#0f7b6c" label="Ingresos" maxValue={maxCloseValue} value={close.totalIncome} />
-                  <MetricBar color="#b42318" label="Gastos comunes" maxValue={maxCloseValue} value={close.totalCommonExpenses} />
-                  <MetricBar color="#3867d6" label="Inversion" maxValue={maxCloseValue} value={close.investmentAmount} />
+              {visibleSummaries.map((summary) => (
+                <View key={summary.month} style={styles.monthBlock}>
+                  <Text style={styles.monthTitle}>{formatMonthLabel(summary.month)}</Text>
                   <MetricBar
-                    color={close.remainingCommonFund >= 0 ? "#2f9e44" : "#9a6700"}
+                    color="#0f7b6c"
+                    label="Ingresos"
+                    maxValue={maxCloseValue}
+                    value={summary.totalIncome}
+                  />
+                  <MetricBar
+                    color="#b42318"
+                    label="Gastos comunes"
+                    maxValue={maxCloseValue}
+                    value={summary.totalCommonExpenses}
+                  />
+                  <MetricBar
+                    color="#3867d6"
+                    label="Inversion"
+                    maxValue={maxCloseValue}
+                    value={summary.investmentAmount}
+                  />
+                  <MetricBar
+                    color={summary.remainingCommonFund >= 0 ? "#2f9e44" : "#9a6700"}
                     label="Fondo restante"
                     maxValue={maxCloseValue}
-                    value={close.remainingCommonFund}
+                    value={summary.remainingCommonFund}
                   />
                 </View>
               ))}
             </>
           ) : (
-            <Text style={styles.empty}>No hay cierres guardados para el periodo elegido.</Text>
+            <Text style={styles.empty}>No hay datos para el periodo elegido.</Text>
           )}
         </Card>
       )}

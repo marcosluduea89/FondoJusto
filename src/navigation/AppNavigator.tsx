@@ -1,6 +1,5 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { BackupScreen } from "../screens/BackupScreen";
-import { CloseMonthScreen } from "../screens/CloseMonthScreen";
 import { ConfigScreen } from "../screens/ConfigScreen";
 import { DashboardScreen } from "../screens/DashboardScreen";
 import { ExpenseScreen } from "../screens/ExpenseScreen";
@@ -15,7 +14,6 @@ export type RootTabParamList = {
   Income: undefined;
   Expense: undefined;
   Config: undefined;
-  Close: undefined;
   Detail: undefined;
   Graph: undefined;
   Backup: undefined;
@@ -40,7 +38,6 @@ export function AppNavigator() {
       <Tab.Screen component={IncomeScreen} name="Income" options={{ title: "Ingreso" }} />
       <Tab.Screen component={ExpenseScreen} name="Expense" options={{ title: "Gasto" }} />
       <Tab.Screen component={ConfigScreen} name="Config" options={{ title: "Config" }} />
-      <Tab.Screen component={CloseMonthScreen} name="Close" options={{ title: "Cierre" }} />
       <Tab.Screen component={MonthlyDetailScreen} name="Detail" options={{ title: "Detalle" }} />
       <Tab.Screen component={GraphScreen} name="Graph" options={{ title: "Grafica" }} />
       <Tab.Screen component={BackupScreen} name="Backup" options={{ title: "Backup" }} />

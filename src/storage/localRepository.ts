@@ -9,7 +9,8 @@ function normalizeData(data: AppData): AppData {
   return {
     ...data,
     people: data.people ?? PEOPLE,
-    monthStates: data.monthStates ?? []
+    monthStates: data.monthStates ?? [],
+    appSettings: data.appSettings ?? { closeDay: 5 }
   };
 }
 
