@@ -1,5 +1,6 @@
 export * from "./appData";
 export * from "./expense";
+export * from "./goal";
 export * from "./income";
 export * from "./monthlyClose";
 export * from "./monthlyConfig";

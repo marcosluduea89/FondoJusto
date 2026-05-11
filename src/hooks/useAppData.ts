@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppData, Expense, Income, MonthlyConfig, MonthState, PersonId } from "../models";
+import { AppData, Expense, Goal, Income, MonthlyConfig, MonthState, PersonId } from "../models";
 import { closeMonth } from "../services/finance";
 import { localRepository } from "../storage/localRepository";
 import { getCurrentMonthKey, isFutureMonth } from "../utils/dates";
@@ -18,7 +18,8 @@ interface UseAppDataResult {
   updatePersonName: (personId: PersonId, name: string) => Promise<void>;
   updatePersonNames: (names: Partial<Record<PersonId, string>>) => Promise<void>;
   saveMonthlyConfig: (config: MonthlyConfig) => Promise<void>;
-  saveAppSettings: (closeDay: number) => Promise<void>;
+  saveGoals: (goals: Goal[]) => Promise<void>;
+  saveAppSettings: (closeDay: number, discountPersonalOverages: boolean) => Promise<void>;
   performMonthlyClose: (month: string) => Promise<void>;
   reopenMonth: (month: string) => Promise<void>;
   importData: (nextData: AppData) => Promise<void>;
@@ -31,18 +32,6 @@ export function useAppData(): UseAppDataResult {
   const [data, setData] = useState<AppData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
-
-  useEffect(() => {
-    localRepository.load().then(async (loadedData) => {
-      setData(loadedData);
-      setIsLoading(false);
-      if (!autoClosuresApplied.current) {
-        autoClosuresApplied.current = true;
-        await applyAutomaticClosures(loadedData);
-      }
-    });
-  }, [applyAutomaticClosures]);
-
   const autoClosuresApplied = useRef(false);
 
   function shouldAutoCloseMonth(month: string, closeDay: number): boolean {
@@ -63,7 +52,7 @@ export function useAppData(): UseAppDataResult {
 
   const applyAutomaticClosures = useCallback(
     async (currentData: AppData) => {
-      const closeDay = currentData.appSettings?.closeDay ?? 5;
+      const closeDay = currentData.appSettings?.closeDay ?? 31;
       const allMonths = new Set<string>([
         ...currentData.incomes.map((income) => income.month),
         ...currentData.expenses.map((expense) => expense.month),
@@ -74,7 +63,10 @@ export function useAppData(): UseAppDataResult {
 
       const monthsToClose = Array.from(allMonths)
         .filter((month) => !isFutureMonth(month))
-        .filter((month) => !currentData.monthStates.some((state) => state.month === month && state.status === "closed"))
+        .filter((month) => {
+          const status = currentData.monthStates.find((state) => state.month === month)?.status ?? "open";
+          return status === "open";
+        })
         .filter((month) => shouldAutoCloseMonth(month, closeDay))
         .sort();
 
@@ -103,6 +95,17 @@ export function useAppData(): UseAppDataResult {
     },
     [persist]
   );
+
+  useEffect(() => {
+    localRepository.load().then(async (loadedData) => {
+      setData(loadedData);
+      setIsLoading(false);
+      if (!autoClosuresApplied.current) {
+        autoClosuresApplied.current = true;
+        await applyAutomaticClosures(loadedData);
+      }
+    });
+  }, [applyAutomaticClosures]);
 
   const addIncome = useCallback(
     async (income: Income) => {
@@ -203,11 +206,20 @@ export function useAppData(): UseAppDataResult {
     [data, persist]
   );
 
-  const saveAppSettings = useCallback(
-    async (closeDay: number) => {
+  const saveGoals = useCallback(
+    async (goals: Goal[]) => {
       if (!data) return;
 
-      await persist({ ...data, appSettings: { closeDay } });
+      await persist({ ...data, goals });
+    },
+    [data, persist]
+  );
+
+  const saveAppSettings = useCallback(
+    async (closeDay: number, discountPersonalOverages: boolean) => {
+      if (!data) return;
+
+      await persist({ ...data, appSettings: { closeDay, discountPersonalOverages } });
     },
     [data, persist]
   );
@@ -280,6 +292,7 @@ export function useAppData(): UseAppDataResult {
       updatePersonName,
       updatePersonNames,
       saveMonthlyConfig,
+      saveGoals,
       saveAppSettings,
       performMonthlyClose,
       reopenMonth,
@@ -300,6 +313,7 @@ export function useAppData(): UseAppDataResult {
       reopenMonth,
       resetDemoData,
       saveAppSettings,
+      saveGoals,
       saveMonthlyConfig,
       selectedMonth,
       updateExpense,

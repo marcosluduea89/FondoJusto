@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { LineChart, PieChart } from "react-native-gifted-charts";
 import { Card } from "../components/Card";
+import { EvolutionGranularity, GranularityToggle } from "../components/GranularityToggle";
 import { MonthSelector } from "../components/MonthSelector";
 import { Screen } from "../components/Screen";
 import { SegmentedControl } from "../components/SegmentedControl";
@@ -11,8 +12,13 @@ import { EXPENSE_CATEGORIES, ExpenseCategory } from "../models";
 import { colors } from "../theme/colors";
 import { buildYAxisLabels } from "../utils/chart";
 import { formatARS } from "../utils/currency";
-import { calculateMonthlySummary, getMonthlyConfig } from "../services/finance";
-import { formatMonthLabel, isFutureMonth } from "../utils/dates";
+import {
+  calculateDailyEvolution,
+  calculateMonthlySummary,
+  getMonthlyConfig,
+  getPersonalOverageCarryover
+} from "../services/finance";
+import { formatMonthLabel, getMonthRange, isFutureMonth } from "../utils/dates";
 import { categoryLabels } from "../utils/labels";
 
 interface BarProps {
@@ -34,6 +40,16 @@ interface LinePoint {
 
 type GraphView = "all" | "evolution" | "expenses";
 type MonthScope = "all_months" | "selected_month";
+
+interface EvolutionChartPoint {
+  key: string;
+  label: string;
+  title: string;
+  totalIncome: number;
+  totalCommonExpenses: number;
+  investmentAmount: number;
+  remainingCommonFund: number;
+}
 
 const CATEGORY_COLORS = [
   "#0f7b6c",
@@ -68,6 +84,7 @@ export function GraphScreen() {
   const { data, isLoading, selectedMonth, setSelectedMonth } = useAppDataContext();
   const [graphView, setGraphView] = useState<GraphView>("all");
   const [monthScope, setMonthScope] = useState<MonthScope>("all_months");
+  const [evolutionGranularity, setEvolutionGranularity] = useState<EvolutionGranularity>("month");
 
   const shouldShowEvolution = graphView === "all" || graphView === "evolution";
   const shouldShowExpenses = graphView === "all" || graphView === "expenses";
@@ -79,9 +96,13 @@ export function GraphScreen() {
     data.incomes.forEach((income) => months.add(income.month));
     data.expenses.forEach((expense) => months.add(expense.month));
 
-    return Array.from(months)
+    const monthsWithData = Array.from(months)
       .filter((month) => !isFutureMonth(month))
       .sort((left, right) => left.localeCompare(right));
+
+    if (!monthsWithData.length) return [];
+
+    return getMonthRange(monthsWithData[0], monthsWithData[monthsWithData.length - 1]);
   }, [data]);
 
   const monthlySummaries = useMemo(
@@ -89,6 +110,7 @@ export function GraphScreen() {
       data
         ? monthKeys.map((month) => {
             const config = getMonthlyConfig(data.monthlyConfigs, month);
+            const personalCarryover = getPersonalOverageCarryover(data, month);
             return {
               month,
               ...calculateMonthlySummary(
@@ -96,7 +118,8 @@ export function GraphScreen() {
                 data.expenses,
                 data.reimbursements,
                 config,
-                month
+                month,
+                personalCarryover
               )
             };
           })
@@ -110,6 +133,36 @@ export function GraphScreen() {
         ? monthlySummaries.filter((summary) => summary.month <= selectedMonth)
         : monthlySummaries.slice(-6),
     [monthlySummaries, monthScope, selectedMonth]
+  );
+  const dailySummaries = useMemo(() => {
+    if (!data) return [];
+
+    const config = getMonthlyConfig(data.monthlyConfigs, selectedMonth);
+    const personalCarryover = getPersonalOverageCarryover(data, selectedMonth);
+    return calculateDailyEvolution(data, config, selectedMonth, personalCarryover);
+  }, [data, selectedMonth]);
+  const activeEvolutionPoints = useMemo<EvolutionChartPoint[]>(
+    () =>
+      evolutionGranularity === "day"
+        ? dailySummaries.map((summary) => ({
+            key: summary.date,
+            label: summary.label,
+            title: summary.date,
+            totalIncome: summary.totalIncome,
+            totalCommonExpenses: summary.totalCommonExpenses,
+            investmentAmount: summary.investmentAmount,
+            remainingCommonFund: summary.remainingCommonFund
+          }))
+        : visibleSummaries.map((summary) => ({
+            key: summary.month,
+            label: summary.month.slice(5, 7),
+            title: formatMonthLabel(summary.month),
+            totalIncome: summary.totalIncome,
+            totalCommonExpenses: summary.totalCommonExpenses,
+            investmentAmount: summary.investmentAmount,
+            remainingCommonFund: summary.remainingCommonFund
+          })),
+    [dailySummaries, evolutionGranularity, visibleSummaries]
   );
 
   const categoryTotals = useMemo<CategoryTotal[]>(() => {
@@ -131,7 +184,7 @@ export function GraphScreen() {
 
   const maxCloseValue = useMemo(
     () =>
-      visibleSummaries.reduce(
+      activeEvolutionPoints.reduce(
         (maxValue, summary) =>
           Math.max(
             maxValue,
@@ -142,32 +195,46 @@ export function GraphScreen() {
           ),
         0
       ),
-    [visibleSummaries]
+    [activeEvolutionPoints]
   );
   const chartMaxValue = maxCloseValue > 0 ? maxCloseValue * 1.2 : 1;
   const chartSections = 4;
   const yAxisLabels = buildYAxisLabels(chartMaxValue, chartSections);
   const maxCategoryValue = categoryTotals.reduce((maxValue, item) => Math.max(maxValue, item.total), 0);
-  const periodLabel = monthScope === "all_months" ? "Todos los meses" : `Hasta ${selectedMonth}`;
+  const evolutionPeriodLabel =
+    evolutionGranularity === "day"
+      ? `Dias de ${selectedMonth}`
+      : monthScope === "all_months"
+        ? "Todos los meses"
+        : `Hasta ${selectedMonth}`;
+  const categoryPeriodLabel = monthScope === "all_months" ? "Todos los meses" : selectedMonth;
   const incomeLineData = useMemo<LinePoint[]>(
-    () => visibleSummaries.map((summary) => ({ label: summary.month.slice(5, 7), value: summary.totalIncome })),
-    [visibleSummaries]
+    () => activeEvolutionPoints.map((summary) => ({ label: summary.label, value: summary.totalIncome })),
+    [activeEvolutionPoints]
   );
   const expenseLineData = useMemo<LinePoint[]>(
     () =>
-      visibleSummaries.map((summary) => ({
-        label: summary.month.slice(5, 7),
+      activeEvolutionPoints.map((summary) => ({
+        label: summary.label,
         value: summary.totalCommonExpenses
       })),
-    [visibleSummaries]
+    [activeEvolutionPoints]
+  );
+  const investmentLineData = useMemo<LinePoint[]>(
+    () =>
+      activeEvolutionPoints.map((summary) => ({
+        label: summary.label,
+        value: summary.investmentAmount
+      })),
+    [activeEvolutionPoints]
   );
   const remainingLineData = useMemo<LinePoint[]>(
     () =>
-      visibleSummaries.map((summary) => ({
-        label: summary.month.slice(5, 7),
+      activeEvolutionPoints.map((summary) => ({
+        label: summary.label,
         value: Math.max(0, summary.remainingCommonFund)
       })),
-    [visibleSummaries]
+    [activeEvolutionPoints]
   );
   const pieData = useMemo(
     () =>
@@ -202,7 +269,7 @@ export function GraphScreen() {
           ]}
           value={monthScope}
         />
-        {monthScope === "selected_month" && (
+        {(monthScope === "selected_month" || evolutionGranularity === "day") && (
           <MonthSelector
             label="Mes a filtrar"
             onChange={setSelectedMonth}
@@ -213,28 +280,34 @@ export function GraphScreen() {
 
       {shouldShowEvolution && (
         <Card>
-          <Text style={styles.sectionTitle}>Evolucion mensual</Text>
+          <Text style={styles.sectionTitle}>Evolucion</Text>
           <Text style={styles.note}>
             Para el mes seleccionado, las graficas muestran la evolución del mes hasta ese punto usando datos actuales, sin requerir cierre.
           </Text>
-          <StatRow label="Periodo" value={periodLabel} />
+          <StatRow label="Periodo" value={evolutionPeriodLabel} />
+          <View style={styles.modeRow}>
+            <Text style={styles.modeLabel}>{evolutionGranularity === "month" ? "Por mes" : "Por dia"}</Text>
+            <GranularityToggle onChange={setEvolutionGranularity} value={evolutionGranularity} />
+          </View>
 
-          {visibleSummaries.length ? (
+          {activeEvolutionPoints.length ? (
             <>
-              {visibleSummaries.length > 1 && (
+              {activeEvolutionPoints.length > 1 && (
                 <View style={styles.chartBox}>
                   <LineChart
                     areaChart
-                    curved
                     data={incomeLineData}
                     data2={expenseLineData}
                     data3={remainingLineData}
+                    data4={investmentLineData}
                     color1="#0f7b6c"
                     color2="#b42318"
                     color3="#3867d6"
+                    color4="#7c3aed"
                     dataPointsColor1="#0f7b6c"
                     dataPointsColor2="#b42318"
                     dataPointsColor3="#3867d6"
+                    dataPointsColor4="#7c3aed"
                     height={180}
                     initialSpacing={8}
                     maxValue={chartMaxValue}
@@ -256,14 +329,15 @@ export function GraphScreen() {
                   <View style={styles.legendRow}>
                     <Text style={[styles.legend, { color: "#0f7b6c" }]}>Ingresos</Text>
                     <Text style={[styles.legend, { color: "#b42318" }]}>Gastos</Text>
+                    <Text style={[styles.legend, { color: "#7c3aed" }]}>Inversion</Text>
                     <Text style={[styles.legend, { color: "#3867d6" }]}>Fondo</Text>
                   </View>
                 </View>
               )}
 
-              {visibleSummaries.map((summary) => (
-                <View key={summary.month} style={styles.monthBlock}>
-                  <Text style={styles.monthTitle}>{formatMonthLabel(summary.month)}</Text>
+              {activeEvolutionPoints.map((summary) => (
+                <View key={summary.key} style={styles.monthBlock}>
+                  <Text style={styles.monthTitle}>{summary.title}</Text>
                   <MetricBar
                     color="#0f7b6c"
                     label="Ingresos"
@@ -300,7 +374,7 @@ export function GraphScreen() {
       {shouldShowExpenses && (
         <Card>
           <Text style={styles.sectionTitle}>Gastos por categoria</Text>
-          <StatRow label="Periodo" value={periodLabel} />
+          <StatRow label="Periodo" value={categoryPeriodLabel} />
 
           {categoryTotals.length ? (
             <>
@@ -395,6 +469,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     textTransform: "capitalize"
+  },
+  modeLabel: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  modeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
   },
   note: {
     color: colors.muted,

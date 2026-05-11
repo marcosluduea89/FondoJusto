@@ -89,6 +89,26 @@ export const seedData: AppData = {
       status: "pending"
     }
   ],
+  goals: [
+    {
+      id: "goal_1",
+      name: "Fondo emergencia",
+      currentAmount: 320000,
+      targetAmount: 1000000
+    },
+    {
+      id: "goal_2",
+      name: "Vacaciones",
+      currentAmount: 150000,
+      targetAmount: 600000
+    },
+    {
+      id: "goal_3",
+      name: "Inversion anual",
+      currentAmount: 442000,
+      targetAmount: 5000000
+    }
+  ],
   monthlyConfigs: [
     {
       month: currentMonth,
@@ -105,6 +125,7 @@ export const seedData: AppData = {
     }
   ],
   appSettings: {
-    closeDay: 5
+    closeDay: 31,
+    discountPersonalOverages: true
   }
 };

@@ -1,16 +1,28 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppData } from "../models";
+import { DEFAULT_GOALS, Goal } from "../models/goal";
 import { PEOPLE } from "../models/person";
 import { seedData } from "./seedData";
 
 const STORAGE_KEY = "@fondojusto/app-data";
 
+function normalizeGoals(goals?: Goal[]): Goal[] {
+  return DEFAULT_GOALS.map((defaultGoal) => ({
+    ...defaultGoal,
+    ...goals?.find((goal) => goal.id === defaultGoal.id)
+  }));
+}
+
 function normalizeData(data: AppData): AppData {
   return {
     ...data,
     people: data.people ?? PEOPLE,
+    goals: normalizeGoals(data.goals),
     monthStates: data.monthStates ?? [],
-    appSettings: data.appSettings ?? { closeDay: 5 }
+    appSettings: {
+      closeDay: data.appSettings?.closeDay ?? 31,
+      discountPersonalOverages: data.appSettings?.discountPersonalOverages ?? true
+    }
   };
 }
 

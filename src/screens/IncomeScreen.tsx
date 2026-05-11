@@ -9,7 +9,7 @@ import { StatRow } from "../components/StatRow";
 import { TextInputField } from "../components/TextInputField";
 import { useAppDataContext } from "../hooks/AppDataContext";
 import { Income, PersonId } from "../models";
-import { formatARS, parseAmountInput } from "../utils/currency";
+import { formatAmountInput, formatARS, parseAmountInput } from "../utils/currency";
 import { getTodayISODate } from "../utils/dates";
 import { createId } from "../utils/ids";
 import { getConfiguredPeople, getPersonName } from "../utils/people";
@@ -52,7 +52,7 @@ export function IncomeScreen() {
     setSelectedMonth(income.month);
     setPersonId(income.personId);
     setDescription(income.description);
-    setAmount(String(income.amount));
+    setAmount(formatAmountInput(String(income.amount)));
     setDate(income.date);
   };
 
@@ -127,8 +127,8 @@ export function IncomeScreen() {
         <TextInputField
           keyboardType="numeric"
           label="Monto"
-          onChangeText={setAmount}
-          placeholder="Ej: 1200000"
+          onChangeText={(value) => setAmount(formatAmountInput(value))}
+          placeholder="Ej: 1.200.000"
           value={amount}
         />
         <TextInputField label="Fecha" onChangeText={setDate} placeholder="YYYY-MM-DD" value={date} />

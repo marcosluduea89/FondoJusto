@@ -14,6 +14,7 @@ export const categoryLabels: Record<ExpenseCategory, string> = {
   salud: "Salud",
   bebe: "Bebe",
   transporte: "Transporte",
+  inversion: "Inversion",
   otros: "Otros"
 };
 

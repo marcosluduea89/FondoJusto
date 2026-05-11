@@ -13,6 +13,8 @@ import { getPersonName } from "../utils/people";
 // Historial basico para revisar cierres, gastos y reintegros sin depender de servidor.
 export function HistoryScreen() {
   const { data, isLoading, resetDemoData } = useAppDataContext();
+  const marcosName = getPersonName(data?.people, "marcos");
+  const wifeName = getPersonName(data?.people, "wife");
 
   return (
     <Screen isLoading={isLoading} title="Historial">
@@ -29,6 +31,9 @@ export function HistoryScreen() {
                 <Text style={styles.itemTitle}>{formatMonthLabel(close.month)}</Text>
                 <StatRow label="Ingresos" value={formatARS(close.totalIncome)} />
                 <StatRow label="Gastos comunes" value={formatARS(close.totalCommonExpenses)} />
+                <StatRow label="Inversion disponible" value={formatARS(close.availableInvestmentAmount ?? close.investmentAmount)} />
+                <StatRow label={`${marcosName} disponible`} value={formatARS(close.availablePersonalAmountMarcos ?? close.finalPersonalAmountMarcos)} />
+                <StatRow label={`${wifeName} disponible`} value={formatARS(close.availablePersonalAmountWife ?? close.finalPersonalAmountWife)} />
                 <StatRow label="Fondo restante" value={formatARS(close.remainingCommonFund)} />
               </View>
             ))

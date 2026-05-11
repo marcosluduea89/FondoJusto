@@ -1,4 +1,12 @@
 import { AppData } from "../models";
+import { DEFAULT_GOALS, Goal } from "../models/goal";
+
+function normalizeGoals(goals?: Goal[]): Goal[] {
+  return DEFAULT_GOALS.map((defaultGoal) => ({
+    ...defaultGoal,
+    ...goals?.find((goal) => goal.id === defaultGoal.id)
+  }));
+}
 
 // Genera un JSON legible para guardar o compartir como copia de seguridad.
 export function buildBackupText(data: AppData): string {
@@ -28,10 +36,14 @@ export function parseBackupText(text: string): AppData {
     incomes: data.incomes,
     expenses: data.expenses,
     reimbursements: data.reimbursements,
+    goals: normalizeGoals(data.goals),
     monthlyConfigs: data.monthlyConfigs,
     monthlyCloses: data.monthlyCloses,
     monthStates: data.monthStates ?? [],
-    appSettings: data.appSettings ?? { closeDay: 5 }
+    appSettings: {
+      closeDay: data.appSettings?.closeDay ?? 31,
+      discountPersonalOverages: data.appSettings?.discountPersonalOverages ?? true
+    }
   };
 }
 

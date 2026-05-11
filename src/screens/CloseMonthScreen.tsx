@@ -6,7 +6,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { StatRow } from "../components/StatRow";
 import { useAppDataContext } from "../hooks/AppDataContext";
-import { calculateMonthlyCloseSummary, getMonthlyConfig } from "../services/finance";
+import { calculateMonthlyCloseSummary, getMonthlyConfig, getPersonalOverageCarryover } from "../services/finance";
 import { colors } from "../theme/colors";
 import { formatARS } from "../utils/currency";
 import { isValidMonthKey } from "../utils/validation";
@@ -31,7 +31,15 @@ export function CloseMonthScreen() {
     if (!data) return null;
 
     const config = getMonthlyConfig(data.monthlyConfigs, selectedMonth);
-    return calculateMonthlyCloseSummary(data.incomes, data.expenses, data.reimbursements, config, selectedMonth);
+    const personalCarryover = getPersonalOverageCarryover(data, selectedMonth);
+    return calculateMonthlyCloseSummary(
+      data.incomes,
+      data.expenses,
+      data.reimbursements,
+      config,
+      selectedMonth,
+      personalCarryover
+    );
   }, [data, selectedMonth]);
 
   const saveClose = async () => {
@@ -74,9 +82,27 @@ export function CloseMonthScreen() {
           <Text style={styles.status}>Estado del mes: {monthStatus}</Text>
           <StatRow label="Ingresos" value={formatARS(summary.totalIncome)} />
           <StatRow label="Gastos comunes" value={formatARS(summary.totalCommonExpenses)} />
-          <StatRow label="Inversion" value={formatARS(summary.investmentAmount)} />
-          <StatRow label={`${marcosName} final`} value={formatARS(summary.finalPersonalAmountMarcos)} />
-          <StatRow label={`${wifeName} final`} value={formatARS(summary.finalPersonalAmountWife)} />
+          <StatRow label="Inversion asignada" value={formatARS(summary.investmentAmount)} />
+          <StatRow label="Inversion usada" value={formatARS(summary.investmentUsed)} />
+          <StatRow label="Inversion disponible" value={formatARS(summary.availableInvestmentAmount)} />
+          <StatRow label={`${marcosName} asignado`} value={formatARS(summary.personalAmountMarcos)} />
+          {summary.personalCarryoverMarcos > 0 && (
+            <StatRow label={`Descuento anterior ${marcosName}`} value={formatARS(summary.personalCarryoverMarcos)} />
+          )}
+          <StatRow label={`Gastos personales ${marcosName}`} value={formatARS(summary.personalExpensesMarcos)} />
+          <StatRow
+            label={`${marcosName} disponible`}
+            value={formatARS(summary.availablePersonalAmountMarcos)}
+          />
+          <StatRow label={`${wifeName} asignado`} value={formatARS(summary.personalAmountWife)} />
+          {summary.personalCarryoverWife > 0 && (
+            <StatRow label={`Descuento anterior ${wifeName}`} value={formatARS(summary.personalCarryoverWife)} />
+          )}
+          <StatRow label={`Gastos personales ${wifeName}`} value={formatARS(summary.personalExpensesWife)} />
+          <StatRow
+            label={`${wifeName} disponible`}
+            value={formatARS(summary.availablePersonalAmountWife)}
+          />
           <StatRow label="Fondo comun restante" tone="positive" value={formatARS(summary.remainingCommonFund)} />
           <Text style={styles.note}>
             Al cerrar, los reintegros pendientes del mes quedan aplicados y los gastos comunes pagados con dinero

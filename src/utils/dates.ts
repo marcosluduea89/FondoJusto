@@ -30,6 +30,21 @@ export function getNextMonthKey(month: string): string {
   return `${nextDate.getFullYear()}-${nextMonth}`;
 }
 
+// Arma una secuencia continua de meses para graficas, incluyendo meses sin movimientos.
+export function getMonthRange(startMonth: string, endMonth: string): string[] {
+  if (startMonth > endMonth) return [];
+
+  const months: string[] = [];
+  let currentMonth = startMonth;
+
+  while (currentMonth <= endMonth) {
+    months.push(currentMonth);
+    currentMonth = getNextMonthKey(currentMonth);
+  }
+
+  return months;
+}
+
 // Fecha ISO simple para guardar altas realizadas desde formularios.
 export function getTodayISODate(): string {
   const date = new Date();

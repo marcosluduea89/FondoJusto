@@ -9,6 +9,7 @@ export type ExpenseCategory =
   | "salud"
   | "bebe"
   | "transporte"
+  | "inversion"
   | "otros";
 
 export type PaymentSource = "common_fund" | "personal_money";
@@ -34,5 +35,6 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   "salud",
   "bebe",
   "transporte",
+  "inversion",
   "otros"
 ];

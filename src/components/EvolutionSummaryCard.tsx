@@ -1,18 +1,25 @@
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { LineChart } from "react-native-gifted-charts";
-import { MonthlyClose } from "../models";
-import { MonthlySummary } from "../services/finance";
+import { AppData, MonthlyClose } from "../models";
+import {
+  calculateDailyEvolution,
+  getMonthlyConfig,
+  getPersonalOverageCarryover,
+  MonthlySummary
+} from "../services/finance";
 import { colors } from "../theme/colors";
 import { buildYAxisLabels } from "../utils/chart";
 import { formatARS } from "../utils/currency";
-import { getPreviousMonthKey } from "../utils/dates";
+import { getMonthRange, getPreviousMonthKey } from "../utils/dates";
+import { EvolutionGranularity, GranularityToggle } from "./GranularityToggle";
 import { SegmentedControl } from "./SegmentedControl";
 
-type DashboardMetric = "income" | "expenses" | "fund";
+type DashboardMetric = "income" | "expenses" | "investment" | "fund";
 
 interface EvolutionSummaryCardProps {
   closes: MonthlyClose[];
+  data: AppData;
   selectedMonth: string;
   summary: MonthlySummary;
 }
@@ -27,6 +34,7 @@ interface EvolutionPoint {
   month: string;
   totalIncome: number;
   totalCommonExpenses: number;
+  investmentAmount: number;
   remainingCommonFund: number;
 }
 
@@ -41,6 +49,11 @@ const METRIC_CONFIG: Record<DashboardMetric, MetricConfig> = {
     label: "Gastos",
     getValue: (close) => close.totalCommonExpenses
   },
+  investment: {
+    color: "#7c3aed",
+    label: "Inversion",
+    getValue: (close) => close.investmentAmount
+  },
   fund: {
     color: "#3867d6",
     label: "Fondo",
@@ -49,14 +62,16 @@ const METRIC_CONFIG: Record<DashboardMetric, MetricConfig> = {
 };
 
 // Tarjeta compacta de inicio para ver una metrica historica sin entrar a la pestana Grafica.
-export function EvolutionSummaryCard({ closes, selectedMonth, summary }: EvolutionSummaryCardProps) {
+export function EvolutionSummaryCard({ closes, data, selectedMonth, summary }: EvolutionSummaryCardProps) {
   const [metric, setMetric] = useState<DashboardMetric>("income");
+  const [granularity, setGranularity] = useState<EvolutionGranularity>("month");
   const metricConfig = METRIC_CONFIG[metric];
   const selectedPoint = useMemo<EvolutionPoint>(
     () => ({
       month: selectedMonth,
       totalIncome: summary.totalIncome,
       totalCommonExpenses: summary.totalCommonExpenses,
+      investmentAmount: summary.investmentAmount,
       remainingCommonFund: summary.remainingCommonFund
     }),
     [selectedMonth, summary]
@@ -73,7 +88,21 @@ export function EvolutionSummaryCard({ closes, selectedMonth, summary }: Evoluti
         .sort((left, right) => left.month.localeCompare(right.month))
         .slice(-5);
 
-      return [...previousPoints, selectedPoint];
+      const pointByMonth = new Map<string, EvolutionPoint>(
+        [...previousPoints, selectedPoint].map((point) => [point.month, point])
+      );
+      const firstMonth = previousPoints[0]?.month ?? selectedMonth;
+
+      return getMonthRange(firstMonth, selectedMonth).map(
+        (month) =>
+          pointByMonth.get(month) ?? {
+            month,
+            totalIncome: 0,
+            totalCommonExpenses: 0,
+            investmentAmount: 0,
+            remainingCommonFund: 0
+          }
+      );
     },
     [closes, selectedMonth, selectedPoint]
   );
@@ -98,6 +127,19 @@ export function EvolutionSummaryCard({ closes, selectedMonth, summary }: Evoluti
     label: close.month.slice(5, 7),
     value: Math.max(0, metricConfig.getValue(close))
   }));
+  const dailyLineData = useMemo(() => {
+    const config = getMonthlyConfig(data.monthlyConfigs, selectedMonth);
+    const personalCarryover = getPersonalOverageCarryover(data, selectedMonth);
+
+    return calculateDailyEvolution(data, config, selectedMonth, personalCarryover).map((point) => ({
+      label: point.label,
+      value: Math.max(0, metricConfig.getValue({ month: selectedMonth, ...point }))
+    }));
+  }, [data, metricConfig, selectedMonth]);
+  const activeLineData = granularity === "day" ? dailyLineData : lineData;
+  const activeMaxValue = activeLineData.reduce((max, point) => Math.max(max, point.value), 0);
+  const activeChartMaxValue = activeMaxValue > 0 ? activeMaxValue * 1.2 : chartMaxValue;
+  const activeYAxisLabels = buildYAxisLabels(activeChartMaxValue, chartSections);
 
   return (
     <View style={styles.container}>
@@ -136,23 +178,28 @@ export function EvolutionSummaryCard({ closes, selectedMonth, summary }: Evoluti
         options={[
           { label: "Ingresos", value: "income" },
           { label: "Gastos", value: "expenses" },
+          { label: "Inversion", value: "investment" },
           { label: "Fondo", value: "fund" }
         ]}
         value={metric}
       />
 
-      {lineData.length > 1 ? (
+      <View style={styles.modeRow}>
+        <Text style={styles.modeLabel}>{granularity === "month" ? "Por mes" : "Por dia"}</Text>
+        <GranularityToggle onChange={setGranularity} value={granularity} />
+      </View>
+
+      {activeLineData.length > 1 ? (
         <View style={styles.chart}>
           <LineChart
             areaChart
-            curved
-            data={lineData}
+            data={activeLineData}
             color1={metricConfig.color}
             dataPointsColor1={metricConfig.color}
             height={150}
             hideRules={false}
             initialSpacing={8}
-            maxValue={chartMaxValue}
+            maxValue={activeChartMaxValue}
             mostNegativeValue={0}
             noOfSections={chartSections}
             noOfSectionsBelowXAxis={0}
@@ -163,14 +210,18 @@ export function EvolutionSummaryCard({ closes, selectedMonth, summary }: Evoluti
             width={280}
             xAxisColor={colors.border}
             yAxisColor={colors.border}
-            yAxisLabelTexts={yAxisLabels}
+            yAxisLabelTexts={activeYAxisLabels}
             yAxisLabelWidth={46}
             yAxisOffset={0}
             yAxisTextStyle={styles.axisText}
           />
         </View>
       ) : (
-        <Text style={styles.empty}>Todavia no hay suficientes cierres para dibujar la linea.</Text>
+        <Text style={styles.empty}>
+          {granularity === "month"
+            ? "Todavia no hay suficientes cierres para dibujar la linea."
+            : "Todavia no hay suficientes movimientos diarios para dibujar la linea."}
+        </Text>
       )}
     </View>
   );
@@ -229,6 +280,16 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontSize: 16,
     fontWeight: "900"
+  },
+  modeLabel: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  modeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
   },
   negative: {
     color: colors.danger

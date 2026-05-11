@@ -9,7 +9,7 @@ import { StatRow } from "../components/StatRow";
 import { TextInputField } from "../components/TextInputField";
 import { useAppDataContext } from "../hooks/AppDataContext";
 import { EXPENSE_CATEGORIES, Expense, ExpenseCategory, PaymentSource, PersonId } from "../models";
-import { formatARS, parseAmountInput } from "../utils/currency";
+import { formatAmountInput, formatARS, parseAmountInput } from "../utils/currency";
 import { getTodayISODate } from "../utils/dates";
 import { createId } from "../utils/ids";
 import { categoryLabels, paymentSourceLabels } from "../utils/labels";
@@ -54,12 +54,19 @@ export function ExpenseScreen() {
     setDate(getTodayISODate());
   };
 
+  const changeCategory = (nextCategory: ExpenseCategory) => {
+    setCategory(nextCategory);
+    if (nextCategory === "inversion") {
+      setIsCommonExpense("no");
+    }
+  };
+
   const editExpense = (expense: Expense) => {
     setEditingExpenseId(expense.id);
     setSelectedMonth(expense.month);
     setCategory(expense.category);
     setDescription(expense.description);
-    setAmount(String(expense.amount));
+    setAmount(formatAmountInput(String(expense.amount)));
     setPaidBy(expense.paidBy);
     setPaymentSource(expense.paymentSource);
     setIsCommonExpense(expense.isCommonExpense ? "yes" : "no");
@@ -132,12 +139,18 @@ export function ExpenseScreen() {
         <MonthSelector label="Mes" onChange={setSelectedMonth} value={selectedMonth} />
         <SegmentedControl
           label="Categoria"
-          onChange={setCategory}
+          onChange={changeCategory}
           options={EXPENSE_CATEGORIES.map((item) => ({ label: categoryLabels[item], value: item }))}
           value={category}
         />
         <TextInputField label="Descripcion" onChangeText={setDescription} placeholder="Detalle del gasto" value={description} />
-        <TextInputField keyboardType="numeric" label="Monto" onChangeText={setAmount} placeholder="Ej: 50000" value={amount} />
+        <TextInputField
+          keyboardType="numeric"
+          label="Monto"
+          onChangeText={(value) => setAmount(formatAmountInput(value))}
+          placeholder="Ej: 50.000"
+          value={amount}
+        />
         <SegmentedControl
           label="Pagado por"
           onChange={setPaidBy}

@@ -7,24 +7,42 @@ import {
   Reimbursement
 } from "../models";
 import { createId } from "../utils/ids";
-import { getNextMonthKey } from "../utils/dates";
+import { getMonthRange, getNextMonthKey, getPreviousMonthKey } from "../utils/dates";
 
 export interface MonthlySummary {
   totalIncome: number;
   totalCommonExpenses: number;
   investmentAmount: number;
+  investmentUsed: number;
+  availableInvestmentAmount: number;
   personalAmountMarcos: number;
   personalAmountWife: number;
+  personalExpensesMarcos: number;
+  personalExpensesWife: number;
+  personalCarryoverMarcos: number;
+  personalCarryoverWife: number;
   pendingReimbursementsMarcos: number;
   pendingReimbursementsWife: number;
   finalPersonalAmountMarcos: number;
   finalPersonalAmountWife: number;
+  availablePersonalAmountMarcos: number;
+  availablePersonalAmountWife: number;
   remainingCommonFund: number;
 }
 
 export interface MonthlyCloseResult {
   close: MonthlyClose;
   reimbursements: Reimbursement[];
+}
+
+export interface DailyEvolutionPoint extends MonthlySummary {
+  date: string;
+  label: string;
+}
+
+interface PersonalCarryover {
+  marcos: number;
+  wife: number;
 }
 
 // Configuracion por defecto para que el MVP funcione aunque el usuario no haya cargado porcentajes.
@@ -98,7 +116,8 @@ export function calculateMonthlySummary(
   expenses: Expense[],
   reimbursements: Reimbursement[],
   config: MonthlyConfig,
-  month: string
+  month: string,
+  personalCarryover: PersonalCarryover = { marcos: 0, wife: 0 }
 ): MonthlySummary {
   const pendingReimbursements = getPendingReimbursementsForExactMonth(reimbursements, month);
 
@@ -107,7 +126,8 @@ export function calculateMonthlySummary(
     expenses,
     pendingReimbursements,
     config,
-    month
+    month,
+    personalCarryover
   );
 }
 
@@ -116,17 +136,24 @@ function calculateMonthlySummaryWithReimbursements(
   expenses: Expense[],
   reimbursementsToApply: Reimbursement[],
   config: MonthlyConfig,
-  month: string
+  month: string,
+  personalCarryover: PersonalCarryover = { marcos: 0, wife: 0 }
 ): MonthlySummary {
   const monthIncomes = getMonthIncomes(incomes, month);
   const monthExpenses = getMonthExpenses(expenses, month);
-  const commonExpenses = monthExpenses.filter((expense) => expense.isCommonExpense);
+  const investmentExpenses = monthExpenses.filter((expense) => expense.category === "inversion");
+  const commonExpenses = monthExpenses.filter((expense) => expense.isCommonExpense && expense.category !== "inversion");
 
   const totalIncome = sumAmounts(monthIncomes);
   const totalCommonExpenses = sumAmounts(commonExpenses);
+  const personalExpenses = monthExpenses.filter((expense) => !expense.isCommonExpense && expense.category !== "inversion");
   const investmentAmount = totalIncome * (config.investmentPercentage / 100);
+  const investmentUsed = sumAmounts(investmentExpenses);
+  const availableInvestmentAmount = investmentAmount - investmentUsed;
   const personalAmountMarcos = totalIncome * (config.personalPercentageMarcos / 100);
   const personalAmountWife = totalIncome * (config.personalPercentageWife / 100);
+  const personalExpensesMarcos = sumAmounts(personalExpenses.filter((expense) => expense.paidBy === "marcos"));
+  const personalExpensesWife = sumAmounts(personalExpenses.filter((expense) => expense.paidBy === "wife"));
   const pendingReimbursementsMarcos = sumAmounts(
     reimbursementsToApply.filter((reimbursement) => reimbursement.personId === "marcos")
   );
@@ -135,23 +162,37 @@ function calculateMonthlySummaryWithReimbursements(
   );
   const finalPersonalAmountMarcos = personalAmountMarcos + pendingReimbursementsMarcos;
   const finalPersonalAmountWife = personalAmountWife + pendingReimbursementsWife;
+  const personalCarryoverMarcos = personalCarryover.marcos;
+  const personalCarryoverWife = personalCarryover.wife;
+  const adjustedPersonalAmountMarcos = Math.max(0, finalPersonalAmountMarcos - personalCarryoverMarcos);
+  const adjustedPersonalAmountWife = Math.max(0, finalPersonalAmountWife - personalCarryoverWife);
+  const availablePersonalAmountMarcos = finalPersonalAmountMarcos - personalCarryoverMarcos - personalExpensesMarcos;
+  const availablePersonalAmountWife = finalPersonalAmountWife - personalCarryoverWife - personalExpensesWife;
   const remainingCommonFund =
     totalIncome -
     totalCommonExpenses -
     investmentAmount -
-    finalPersonalAmountMarcos -
-    finalPersonalAmountWife;
+    adjustedPersonalAmountMarcos -
+    adjustedPersonalAmountWife;
 
   return {
     totalIncome,
     totalCommonExpenses,
     investmentAmount,
+    investmentUsed,
+    availableInvestmentAmount,
     personalAmountMarcos,
     personalAmountWife,
+    personalExpensesMarcos,
+    personalExpensesWife,
+    personalCarryoverMarcos,
+    personalCarryoverWife,
     pendingReimbursementsMarcos,
     pendingReimbursementsWife,
     finalPersonalAmountMarcos,
     finalPersonalAmountWife,
+    availablePersonalAmountMarcos,
+    availablePersonalAmountWife,
     remainingCommonFund
   };
 }
@@ -162,11 +203,80 @@ export function calculateMonthlyCloseSummary(
   expenses: Expense[],
   reimbursements: Reimbursement[],
   config: MonthlyConfig,
-  month: string
+  month: string,
+  personalCarryover: PersonalCarryover = { marcos: 0, wife: 0 }
 ): MonthlySummary {
   const closeReimbursements = getReimbursementsForMonthlyClose(reimbursements, month);
 
-  return calculateMonthlySummaryWithReimbursements(incomes, expenses, closeReimbursements, config, month);
+  return calculateMonthlySummaryWithReimbursements(incomes, expenses, closeReimbursements, config, month, personalCarryover);
+}
+
+// Calcula acumulados por fecha dentro de un mes para ver como cambia la curva diaria.
+export function calculateDailyEvolution(
+  data: AppData,
+  config: MonthlyConfig,
+  month: string,
+  personalCarryover: PersonalCarryover = { marcos: 0, wife: 0 }
+): DailyEvolutionPoint[] {
+  const dates = new Set<string>();
+
+  getMonthIncomes(data.incomes, month).forEach((income) => dates.add(income.date));
+  getMonthExpenses(data.expenses, month).forEach((expense) => dates.add(expense.date));
+
+  return Array.from(dates)
+    .sort((left, right) => left.localeCompare(right))
+    .map((date) => ({
+      date,
+      label: date.slice(8, 10),
+      ...calculateMonthlySummary(
+        data.incomes.filter((income) => income.month !== month || income.date <= date),
+        data.expenses.filter((expense) => expense.month !== month || expense.date <= date),
+        data.reimbursements,
+        config,
+        month,
+        personalCarryover
+      )
+    }));
+}
+
+export function getPersonalOverageCarryover(data: AppData, month: string): PersonalCarryover {
+  if (data.appSettings?.discountPersonalOverages === false) {
+    return { marcos: 0, wife: 0 };
+  }
+
+  const monthsWithData = [
+    ...data.incomes.map((income) => income.month),
+    ...data.expenses.map((expense) => expense.month),
+    ...data.reimbursements.map((reimbursement) => reimbursement.targetMonth),
+    ...data.monthlyConfigs.map((config) => config.month)
+  ].sort((left, right) => left.localeCompare(right));
+
+  const firstMonth = monthsWithData[0];
+  const lastMonth = getPreviousMonthKey(month);
+
+  if (!firstMonth || firstMonth > lastMonth) {
+    return { marcos: 0, wife: 0 };
+  }
+
+  return getMonthRange(firstMonth, lastMonth).reduce<PersonalCarryover>(
+    (carryover, currentMonth) => {
+      const config = getMonthlyConfig(data.monthlyConfigs, currentMonth);
+      const summary = calculateMonthlySummary(
+        data.incomes,
+        data.expenses,
+        data.reimbursements,
+        config,
+        currentMonth,
+        carryover
+      );
+
+      return {
+        marcos: Math.max(0, -summary.availablePersonalAmountMarcos),
+        wife: Math.max(0, -summary.availablePersonalAmountWife)
+      };
+    },
+    { marcos: 0, wife: 0 }
+  );
 }
 
 // Crea reintegros para gastos comunes pagados desde dinero personal.
@@ -200,12 +310,14 @@ export function buildNewReimbursementsForMonth(
 // Genera un cierre mensual y devuelve la nueva lista de reintegros con los aplicados marcados.
 export function closeMonth(data: AppData, month: string): MonthlyCloseResult {
   const config = getMonthlyConfig(data.monthlyConfigs, month);
+  const personalCarryover = getPersonalOverageCarryover(data, month);
   const summary = calculateMonthlyCloseSummary(
     data.incomes,
     data.expenses,
     data.reimbursements,
     config,
-    month
+    month,
+    personalCarryover
   );
   const pendingForMonth = getPendingReimbursementsForClose(data.reimbursements, month);
   const pendingIds = new Set(pendingForMonth.map((reimbursement) => reimbursement.id));
@@ -227,14 +339,22 @@ export function closeMonth(data: AppData, month: string): MonthlyCloseResult {
     totalCommonExpenses: summary.totalCommonExpenses,
     investmentPercentage: config.investmentPercentage,
     investmentAmount: summary.investmentAmount,
+    investmentUsed: summary.investmentUsed,
+    availableInvestmentAmount: summary.availableInvestmentAmount,
     personalPercentageMarcos: config.personalPercentageMarcos,
     personalAmountMarcos: summary.personalAmountMarcos,
     personalPercentageWife: config.personalPercentageWife,
     personalAmountWife: summary.personalAmountWife,
+    personalCarryoverMarcos: summary.personalCarryoverMarcos,
+    personalCarryoverWife: summary.personalCarryoverWife,
     reimbursementsAppliedMarcos: summary.pendingReimbursementsMarcos,
     reimbursementsAppliedWife: summary.pendingReimbursementsWife,
     finalPersonalAmountMarcos: summary.finalPersonalAmountMarcos,
     finalPersonalAmountWife: summary.finalPersonalAmountWife,
+    personalExpensesMarcos: summary.personalExpensesMarcos,
+    personalExpensesWife: summary.personalExpensesWife,
+    availablePersonalAmountMarcos: summary.availablePersonalAmountMarcos,
+    availablePersonalAmountWife: summary.availablePersonalAmountWife,
     remainingCommonFund: summary.remainingCommonFund
   };
 
