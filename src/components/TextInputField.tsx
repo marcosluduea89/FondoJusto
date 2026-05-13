@@ -5,9 +5,12 @@ interface TextInputFieldProps {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  autoCorrect?: boolean;
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
   multiline?: boolean;
+  secureTextEntry?: boolean;
 }
 
 // Campo de texto con etiqueta consistente para formularios de ingresos, gastos y configuracion.
@@ -15,18 +18,24 @@ export function TextInputField({
   label,
   value,
   onChangeText,
+  autoCapitalize,
+  autoCorrect,
   placeholder,
   keyboardType = "default",
-  multiline = false
+  multiline = false,
+  secureTextEntry = false
 }: TextInputFieldProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
         keyboardType={keyboardType}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
+        secureTextEntry={secureTextEntry}
         multiline={multiline}
         style={[styles.input, multiline && styles.multiline]}
         value={value}

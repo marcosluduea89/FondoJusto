@@ -8,6 +8,8 @@ import { SegmentedControl } from "../components/SegmentedControl";
 import { StatRow } from "../components/StatRow";
 import { TextInputField } from "../components/TextInputField";
 import { useAppDataContext } from "../hooks/AppDataContext";
+import { useAuthContext } from "../hooks/AuthContext";
+import { useHouseholdContext } from "../hooks/HouseholdContext";
 import { Goal } from "../models";
 import { DEFAULT_GOALS } from "../models/goal";
 import { getMonthlyConfig } from "../services/finance";
@@ -31,6 +33,8 @@ export function ConfigScreen() {
     setSelectedMonth,
     updatePersonNames
   } = useAppDataContext();
+  const { signOut, user } = useAuthContext();
+  const { household } = useHouseholdContext();
 
   const config = useMemo(
     () => (data ? getMonthlyConfig(data.monthlyConfigs, selectedMonth) : null),
@@ -269,8 +273,33 @@ export function ConfigScreen() {
     Alert.alert("Personas guardadas", "Los nombres se actualizaron en toda la app.");
   };
 
+  const closeSession = () => {
+    Alert.alert("Cerrar sesion", "Vas a salir de tu cuenta en este celular.", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Cerrar sesion",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "No se pudo cerrar sesion.";
+            Alert.alert("Supabase", message);
+          }
+        }
+      }
+    ]);
+  };
+
   return (
     <Screen isLoading={isLoading} title="Configuracion mensual">
+      <Card>
+        <Text style={styles.sectionTitle}>Cuenta</Text>
+        <StatRow label="Usuario" value={user?.email ?? "Sin email"} />
+        <StatRow label="Hogar" value={household?.name ?? "Sin hogar"} />
+        <PrimaryButton label="Cerrar sesion" onPress={closeSession} variant="secondary" />
+      </Card>
+
       <Card>
         <TextInputField label="Persona 1" onChangeText={setMarcosName} placeholder="Marcos" value={marcosName} />
         <TextInputField label="Persona 2" onChangeText={setWifeName} placeholder="Esposa" value={wifeName} />
