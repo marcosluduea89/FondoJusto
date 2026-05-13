@@ -44,6 +44,9 @@ export function DashboardScreen() {
   const wifeName = getPersonName(data?.people, "wife");
   const shouldShowMarcos = personalMoneyView === "marcos" || personalMoneyView === "both";
   const shouldShowWife = personalMoneyView === "wife" || personalMoneyView === "both";
+  const totalMonthlyAllocations = summary
+    ? summary.investmentAmount + summary.goalsAmount + summary.personalAmountMarcos + summary.personalAmountWife
+    : 0;
 
   return (
     <Screen isLoading={isLoading} title="Dashboard mensual">
@@ -63,14 +66,23 @@ export function DashboardScreen() {
           <Card>
             <Text style={styles.month}>{formatMonthLabel(selectedMonth)}</Text>
             <StatRow label="Total ingresos" value={formatARS(summary.totalIncome)} />
+            <StatRow label="Asignaciones mensuales" value={formatARS(totalMonthlyAllocations)} />
             <StatRow label="Total gastos comunes" value={formatARS(summary.totalCommonExpenses)} />
-            <StatRow label="Fondo comun restante" tone="positive" value={formatARS(summary.remainingCommonFund)} />
+            <StatRow label="Fondo comun disponible" tone="positive" value={formatARS(summary.remainingCommonFund)} />
+          </Card>
+
+          <Card>
+            <Text style={styles.sectionTitle}>Asignaciones mensuales</Text>
+            <StatRow label="Inversion" value={formatARS(summary.investmentAmount)} />
+            <StatRow label="Objetivos" value={formatARS(summary.goalsAmount)} />
+            <StatRow label={`Personal ${marcosName}`} value={formatARS(summary.personalAmountMarcos)} />
+            <StatRow label={`Personal ${wifeName}`} value={formatARS(summary.personalAmountWife)} />
           </Card>
 
           <Card>
             <Text style={styles.sectionTitle}>Inversion</Text>
-            <StatRow label="Asignado" value={formatARS(summary.investmentAmount)} />
-            <StatRow label="Usado" value={formatARS(summary.investmentUsed)} />
+            <StatRow label="Asignacion mensual" value={formatARS(summary.investmentAmount)} />
+            <StatRow label="Usado en inversion" value={formatARS(summary.investmentUsed)} />
             <StatRow
               label="Disponible"
               tone={summary.availableInvestmentAmount >= 0 ? "positive" : "warning"}
@@ -79,13 +91,12 @@ export function DashboardScreen() {
           </Card>
 
           <Card>
-            <GoalProgressCard goals={data.goals} />
+            <GoalProgressCard goals={data.goals} goalsAmount={summary.goalsAmount} />
           </Card>
 
           <Card>
             <Text style={styles.sectionTitle}>Dinero personal</Text>
             <SegmentedControl
-              label="Ver"
               onChange={setPersonalMoneyView}
               options={[
                 { label: marcosName, value: "marcos" },
@@ -142,7 +153,7 @@ export function DashboardScreen() {
           </Card>
 
           <Text style={styles.note}>
-            El disponible personal se recalcula con ingresos, reintegros y gastos personales del mes.
+            El fondo comun disponible queda despues de separar inversion, objetivos y dinero personal.
           </Text>
         </>
       )}

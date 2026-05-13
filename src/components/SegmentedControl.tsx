@@ -7,7 +7,7 @@ interface Option<T extends string> {
 }
 
 interface SegmentedControlProps<T extends string> {
-  label: string;
+  label?: string;
   options: Option<T>[];
   value: T;
   onChange: (value: T) => void;
@@ -22,7 +22,7 @@ export function SegmentedControl<T extends string>({
 }: SegmentedControlProps<T>) {
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <View style={styles.options}>
         {options.map((option) => {
           const isSelected = option.value === value;

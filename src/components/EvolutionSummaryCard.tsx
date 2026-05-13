@@ -144,7 +144,6 @@ export function EvolutionSummaryCard({ closes, data, selectedMonth, summary }: E
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>Evolucion</Text>
         <Text style={styles.metricName}>{metricConfig.label}</Text>
         <Text style={styles.amount}>{formatARS(currentValue)}</Text>
         {!hasCurrentData ? (
@@ -267,11 +266,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     lineHeight: 18
-  },
-  eyebrow: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: "700"
   },
   header: {
     gap: 4

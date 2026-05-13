@@ -10,6 +10,8 @@ import { Reimbursement } from "./reimbursement";
 export interface AppSettings {
   closeDay: number;
   discountPersonalOverages: boolean;
+  estimatedMonthlyIncome: number;
+  basicBasketAmount: number;
 }
 
 // Estado completo persistido localmente. Mantenerlo tipado facilita cambiar de backend luego.

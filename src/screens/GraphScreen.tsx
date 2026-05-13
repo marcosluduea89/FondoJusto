@@ -48,6 +48,7 @@ interface EvolutionChartPoint {
   totalIncome: number;
   totalCommonExpenses: number;
   investmentAmount: number;
+  goalsAmount: number;
   remainingCommonFund: number;
 }
 
@@ -151,6 +152,7 @@ export function GraphScreen() {
             totalIncome: summary.totalIncome,
             totalCommonExpenses: summary.totalCommonExpenses,
             investmentAmount: summary.investmentAmount,
+            goalsAmount: summary.goalsAmount,
             remainingCommonFund: summary.remainingCommonFund
           }))
         : visibleSummaries.map((summary) => ({
@@ -160,6 +162,7 @@ export function GraphScreen() {
             totalIncome: summary.totalIncome,
             totalCommonExpenses: summary.totalCommonExpenses,
             investmentAmount: summary.investmentAmount,
+            goalsAmount: summary.goalsAmount,
             remainingCommonFund: summary.remainingCommonFund
           })),
     [dailySummaries, evolutionGranularity, visibleSummaries]
@@ -191,6 +194,7 @@ export function GraphScreen() {
             summary.totalIncome,
             summary.totalCommonExpenses,
             summary.investmentAmount,
+            summary.goalsAmount,
             Math.abs(summary.remainingCommonFund)
           ),
         0
@@ -225,6 +229,14 @@ export function GraphScreen() {
       activeEvolutionPoints.map((summary) => ({
         label: summary.label,
         value: summary.investmentAmount
+      })),
+    [activeEvolutionPoints]
+  );
+  const goalsLineData = useMemo<LinePoint[]>(
+    () =>
+      activeEvolutionPoints.map((summary) => ({
+        label: summary.label,
+        value: summary.goalsAmount
       })),
     [activeEvolutionPoints]
   );
@@ -300,14 +312,17 @@ export function GraphScreen() {
                     data2={expenseLineData}
                     data3={remainingLineData}
                     data4={investmentLineData}
+                    data5={goalsLineData}
                     color1="#0f7b6c"
                     color2="#b42318"
                     color3="#3867d6"
                     color4="#7c3aed"
+                    color5="#0f766e"
                     dataPointsColor1="#0f7b6c"
                     dataPointsColor2="#b42318"
                     dataPointsColor3="#3867d6"
                     dataPointsColor4="#7c3aed"
+                    dataPointsColor5="#0f766e"
                     height={180}
                     initialSpacing={8}
                     maxValue={chartMaxValue}
@@ -330,6 +345,7 @@ export function GraphScreen() {
                     <Text style={[styles.legend, { color: "#0f7b6c" }]}>Ingresos</Text>
                     <Text style={[styles.legend, { color: "#b42318" }]}>Gastos</Text>
                     <Text style={[styles.legend, { color: "#7c3aed" }]}>Inversion</Text>
+                    <Text style={[styles.legend, { color: "#0f766e" }]}>Objetivos</Text>
                     <Text style={[styles.legend, { color: "#3867d6" }]}>Fondo</Text>
                   </View>
                 </View>
@@ -355,6 +371,12 @@ export function GraphScreen() {
                     label="Inversion"
                     maxValue={maxCloseValue}
                     value={summary.investmentAmount}
+                  />
+                  <MetricBar
+                    color="#0f766e"
+                    label="Objetivos"
+                    maxValue={maxCloseValue}
+                    value={summary.goalsAmount}
                   />
                   <MetricBar
                     color={summary.remainingCommonFund >= 0 ? "#2f9e44" : "#9a6700"}

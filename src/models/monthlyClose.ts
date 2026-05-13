@@ -8,6 +8,8 @@ export interface MonthlyClose {
   investmentAmount: number;
   investmentUsed: number;
   availableInvestmentAmount: number;
+  goalsPercentage: number;
+  goalsAmount: number;
   personalPercentageMarcos: number;
   personalAmountMarcos: number;
   personalPercentageWife: number;

@@ -20,17 +20,52 @@ export function isValidISODate(date: string): boolean {
 // Evita cierres imposibles donde los porcentajes consumen mas que todo el ingreso.
 export function validateMonthlyPercentages(
   investmentPercentage: number,
+  goalsPercentage: number,
   personalPercentageMarcos: number,
   personalPercentageWife: number
 ): string | null {
-  const percentages = [investmentPercentage, personalPercentageMarcos, personalPercentageWife];
+  const percentages = [investmentPercentage, goalsPercentage, personalPercentageMarcos, personalPercentageWife];
+  const total = percentages.reduce((sum, percentage) => sum + percentage, 0);
+
+  if (percentages.some((percentage) => !Number.isFinite(percentage))) {
+    return "Ingresa solo numeros validos en las asignaciones.";
+  }
 
   if (percentages.some((percentage) => percentage < 0)) {
     return "Los porcentajes no pueden ser negativos.";
   }
 
-  if (percentages.reduce((total, percentage) => total + percentage, 0) > 100) {
-    return "La suma de inversion y dinero personal no puede superar el 100%.";
+  if (total > 100) {
+    return `La suma de inversion, objetivos y dinero personal es ${total}% y no puede superar el 100%.`;
+  }
+
+  return null;
+}
+
+export function validateGoalAllocationPercentages(
+  goalsPercentage: number,
+  goalAllocations: number[]
+): string | null {
+  if (goalAllocations.some((percentage) => !Number.isFinite(percentage))) {
+    return "Ingresa solo numeros validos en la distribucion de objetivos.";
+  }
+
+  if (goalAllocations.some((percentage) => percentage < 0)) {
+    return "Los porcentajes de objetivos no pueden ser negativos.";
+  }
+
+  if (goalsPercentage <= 0) {
+    return null;
+  }
+
+  if (!goalAllocations.length) {
+    return "Carga al menos un objetivo activo si vas a destinar porcentaje a objetivos.";
+  }
+
+  const total = goalAllocations.reduce((sum, percentage) => sum + percentage, 0);
+
+  if (Math.abs(total - 100) > 0.01) {
+    return `La distribucion entre objetivos activos suma ${total}% y debe ser exactamente 100%.`;
   }
 
   return null;

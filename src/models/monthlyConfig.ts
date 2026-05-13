@@ -2,6 +2,7 @@
 export interface MonthlyConfig {
   month: string;
   investmentPercentage: number;
+  goalsPercentage: number;
   personalPercentageMarcos: number;
   personalPercentageWife: number;
 }

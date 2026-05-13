@@ -41,6 +41,9 @@ export function CloseMonthScreen() {
       personalCarryover
     );
   }, [data, selectedMonth]);
+  const totalMonthlyAllocations = summary
+    ? summary.investmentAmount + summary.goalsAmount + summary.personalAmountMarcos + summary.personalAmountWife
+    : 0;
 
   const saveClose = async () => {
     await performMonthlyClose(selectedMonth);
@@ -82,10 +85,12 @@ export function CloseMonthScreen() {
           <Text style={styles.status}>Estado del mes: {monthStatus}</Text>
           <StatRow label="Ingresos" value={formatARS(summary.totalIncome)} />
           <StatRow label="Gastos comunes" value={formatARS(summary.totalCommonExpenses)} />
-          <StatRow label="Inversion asignada" value={formatARS(summary.investmentAmount)} />
+          <StatRow label="Asignaciones mensuales" value={formatARS(totalMonthlyAllocations)} />
+          <StatRow label="Inversion" value={formatARS(summary.investmentAmount)} />
           <StatRow label="Inversion usada" value={formatARS(summary.investmentUsed)} />
           <StatRow label="Inversion disponible" value={formatARS(summary.availableInvestmentAmount)} />
-          <StatRow label={`${marcosName} asignado`} value={formatARS(summary.personalAmountMarcos)} />
+          <StatRow label="Objetivos" value={formatARS(summary.goalsAmount)} />
+          <StatRow label={`Personal ${marcosName}`} value={formatARS(summary.personalAmountMarcos)} />
           {summary.personalCarryoverMarcos > 0 && (
             <StatRow label={`Descuento anterior ${marcosName}`} value={formatARS(summary.personalCarryoverMarcos)} />
           )}
@@ -94,7 +99,7 @@ export function CloseMonthScreen() {
             label={`${marcosName} disponible`}
             value={formatARS(summary.availablePersonalAmountMarcos)}
           />
-          <StatRow label={`${wifeName} asignado`} value={formatARS(summary.personalAmountWife)} />
+          <StatRow label={`Personal ${wifeName}`} value={formatARS(summary.personalAmountWife)} />
           {summary.personalCarryoverWife > 0 && (
             <StatRow label={`Descuento anterior ${wifeName}`} value={formatARS(summary.personalCarryoverWife)} />
           )}
@@ -103,7 +108,7 @@ export function CloseMonthScreen() {
             label={`${wifeName} disponible`}
             value={formatARS(summary.availablePersonalAmountWife)}
           />
-          <StatRow label="Fondo comun restante" tone="positive" value={formatARS(summary.remainingCommonFund)} />
+          <StatRow label="Fondo comun disponible" tone="positive" value={formatARS(summary.remainingCommonFund)} />
           <Text style={styles.note}>
             Al cerrar, los reintegros pendientes del mes quedan aplicados y los gastos comunes pagados con dinero
             personal generan reintegros para el mes siguiente.

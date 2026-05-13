@@ -94,25 +94,29 @@ export const seedData: AppData = {
       id: "goal_1",
       name: "Fondo emergencia",
       currentAmount: 320000,
-      targetAmount: 1000000
+      targetAmount: 1000000,
+      allocationPercentage: 60
     },
     {
       id: "goal_2",
       name: "Vacaciones",
       currentAmount: 150000,
-      targetAmount: 600000
+      targetAmount: 600000,
+      allocationPercentage: 30
     },
     {
       id: "goal_3",
       name: "Inversion anual",
       currentAmount: 442000,
-      targetAmount: 5000000
+      targetAmount: 5000000,
+      allocationPercentage: 10
     }
   ],
   monthlyConfigs: [
     {
       month: currentMonth,
       investmentPercentage: 10,
+      goalsPercentage: 10,
       personalPercentageMarcos: 5,
       personalPercentageWife: 5
     }
@@ -126,6 +130,8 @@ export const seedData: AppData = {
   ],
   appSettings: {
     closeDay: 31,
-    discountPersonalOverages: true
+    discountPersonalOverages: true,
+    estimatedMonthlyIncome: 2220000,
+    basicBasketAmount: 1370000
   }
 };

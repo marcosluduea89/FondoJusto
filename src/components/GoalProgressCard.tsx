@@ -1,14 +1,16 @@
 import { StyleSheet, Text, View } from "react-native";
 import { Goal } from "../models";
+import { calculateGoalAllocations } from "../services/finance";
 import { colors } from "../theme/colors";
 import { formatARS } from "../utils/currency";
 
 interface GoalProgressCardProps {
   goals: Goal[];
+  goalsAmount: number;
 }
 
-export function GoalProgressCard({ goals }: GoalProgressCardProps) {
-  const visibleGoals = goals.filter((goal) => goal.name.trim() && goal.targetAmount > 0);
+export function GoalProgressCard({ goals, goalsAmount }: GoalProgressCardProps) {
+  const visibleGoals = calculateGoalAllocations(goals, goalsAmount);
 
   if (!visibleGoals.length) {
     return (
@@ -39,6 +41,9 @@ export function GoalProgressCard({ goals }: GoalProgressCardProps) {
             <View style={styles.track}>
               <View style={[styles.fill, { width: `${percentage}%` }]} />
             </View>
+            <Text style={styles.remaining}>
+              Asignacion mensual: {formatARS(goal.assignedAmount)} ({goal.allocationPercentage}% de objetivos)
+            </Text>
             <Text style={styles.remaining}>Faltan {formatARS(remaining)}</Text>
           </View>
         );

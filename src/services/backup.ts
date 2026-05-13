@@ -1,10 +1,15 @@
 import { AppData } from "../models";
 import { DEFAULT_GOALS, Goal } from "../models/goal";
 
+const DEFAULT_BASIC_BASKET_AMOUNT = 1370000;
+
 function normalizeGoals(goals?: Goal[]): Goal[] {
   return DEFAULT_GOALS.map((defaultGoal) => ({
     ...defaultGoal,
-    ...goals?.find((goal) => goal.id === defaultGoal.id)
+    ...goals?.find((goal) => goal.id === defaultGoal.id),
+    allocationPercentage:
+      goals?.find((goal) => goal.id === defaultGoal.id)?.allocationPercentage ??
+      defaultGoal.allocationPercentage
   }));
 }
 
@@ -37,12 +42,17 @@ export function parseBackupText(text: string): AppData {
     expenses: data.expenses,
     reimbursements: data.reimbursements,
     goals: normalizeGoals(data.goals),
-    monthlyConfigs: data.monthlyConfigs,
+    monthlyConfigs: data.monthlyConfigs.map((config) => ({
+      ...config,
+      goalsPercentage: config.goalsPercentage ?? 0
+    })),
     monthlyCloses: data.monthlyCloses,
     monthStates: data.monthStates ?? [],
     appSettings: {
       closeDay: data.appSettings?.closeDay ?? 31,
-      discountPersonalOverages: data.appSettings?.discountPersonalOverages ?? true
+      discountPersonalOverages: data.appSettings?.discountPersonalOverages ?? true,
+      estimatedMonthlyIncome: data.appSettings?.estimatedMonthlyIncome ?? 0,
+      basicBasketAmount: data.appSettings?.basicBasketAmount ?? DEFAULT_BASIC_BASKET_AMOUNT
     }
   };
 }

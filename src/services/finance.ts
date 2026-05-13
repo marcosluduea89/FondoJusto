@@ -1,6 +1,7 @@
 import {
   AppData,
   Expense,
+  Goal,
   Income,
   MonthlyClose,
   MonthlyConfig,
@@ -15,6 +16,7 @@ export interface MonthlySummary {
   investmentAmount: number;
   investmentUsed: number;
   availableInvestmentAmount: number;
+  goalsAmount: number;
   personalAmountMarcos: number;
   personalAmountWife: number;
   personalExpensesMarcos: number;
@@ -48,6 +50,7 @@ interface PersonalCarryover {
 // Configuracion por defecto para que el MVP funcione aunque el usuario no haya cargado porcentajes.
 export const DEFAULT_MONTHLY_CONFIG: Omit<MonthlyConfig, "month"> = {
   investmentPercentage: 10,
+  goalsPercentage: 0,
   personalPercentageMarcos: 5,
   personalPercentageWife: 5
 };
@@ -59,12 +62,20 @@ export function sumAmounts(items: Array<{ amount: number }>): number {
 
 // Busca la configuracion mensual o genera una configuracion segura para ese mes.
 export function getMonthlyConfig(configs: MonthlyConfig[], month: string): MonthlyConfig {
-  return (
-    configs.find((config) => config.month === month) ?? {
-      month,
-      ...DEFAULT_MONTHLY_CONFIG
-    }
-  );
+  return {
+    month,
+    ...DEFAULT_MONTHLY_CONFIG,
+    ...configs.find((config) => config.month === month)
+  };
+}
+
+export function calculateGoalAllocations(goals: Goal[], goalsAmount: number): Array<Goal & { assignedAmount: number }> {
+  return goals
+    .filter((goal) => goal.name.trim() && goal.targetAmount > 0)
+    .map((goal) => ({
+      ...goal,
+      assignedAmount: goalsAmount * (goal.allocationPercentage / 100)
+    }));
 }
 
 // Filtra ingresos del mes seleccionado.
@@ -150,6 +161,7 @@ function calculateMonthlySummaryWithReimbursements(
   const investmentAmount = totalIncome * (config.investmentPercentage / 100);
   const investmentUsed = sumAmounts(investmentExpenses);
   const availableInvestmentAmount = investmentAmount - investmentUsed;
+  const goalsAmount = totalIncome * (config.goalsPercentage / 100);
   const personalAmountMarcos = totalIncome * (config.personalPercentageMarcos / 100);
   const personalAmountWife = totalIncome * (config.personalPercentageWife / 100);
   const personalExpensesMarcos = sumAmounts(personalExpenses.filter((expense) => expense.paidBy === "marcos"));
@@ -172,6 +184,7 @@ function calculateMonthlySummaryWithReimbursements(
     totalIncome -
     totalCommonExpenses -
     investmentAmount -
+    goalsAmount -
     adjustedPersonalAmountMarcos -
     adjustedPersonalAmountWife;
 
@@ -181,6 +194,7 @@ function calculateMonthlySummaryWithReimbursements(
     investmentAmount,
     investmentUsed,
     availableInvestmentAmount,
+    goalsAmount,
     personalAmountMarcos,
     personalAmountWife,
     personalExpensesMarcos,
@@ -341,6 +355,8 @@ export function closeMonth(data: AppData, month: string): MonthlyCloseResult {
     investmentAmount: summary.investmentAmount,
     investmentUsed: summary.investmentUsed,
     availableInvestmentAmount: summary.availableInvestmentAmount,
+    goalsPercentage: config.goalsPercentage,
+    goalsAmount: summary.goalsAmount,
     personalPercentageMarcos: config.personalPercentageMarcos,
     personalAmountMarcos: summary.personalAmountMarcos,
     personalPercentageWife: config.personalPercentageWife,

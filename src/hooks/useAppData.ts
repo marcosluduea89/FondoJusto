@@ -19,7 +19,12 @@ interface UseAppDataResult {
   updatePersonNames: (names: Partial<Record<PersonId, string>>) => Promise<void>;
   saveMonthlyConfig: (config: MonthlyConfig) => Promise<void>;
   saveGoals: (goals: Goal[]) => Promise<void>;
-  saveAppSettings: (closeDay: number, discountPersonalOverages: boolean) => Promise<void>;
+  saveAppSettings: (
+    closeDay: number,
+    discountPersonalOverages: boolean,
+    estimatedMonthlyIncome: number,
+    basicBasketAmount: number
+  ) => Promise<void>;
   performMonthlyClose: (month: string) => Promise<void>;
   reopenMonth: (month: string) => Promise<void>;
   importData: (nextData: AppData) => Promise<void>;
@@ -216,10 +221,23 @@ export function useAppData(): UseAppDataResult {
   );
 
   const saveAppSettings = useCallback(
-    async (closeDay: number, discountPersonalOverages: boolean) => {
+    async (
+      closeDay: number,
+      discountPersonalOverages: boolean,
+      estimatedMonthlyIncome: number,
+      basicBasketAmount: number
+    ) => {
       if (!data) return;
 
-      await persist({ ...data, appSettings: { closeDay, discountPersonalOverages } });
+      await persist({
+        ...data,
+        appSettings: {
+          closeDay,
+          discountPersonalOverages,
+          estimatedMonthlyIncome,
+          basicBasketAmount
+        }
+      });
     },
     [data, persist]
   );

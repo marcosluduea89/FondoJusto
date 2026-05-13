@@ -32,9 +32,10 @@ export function HistoryScreen() {
                 <StatRow label="Ingresos" value={formatARS(close.totalIncome)} />
                 <StatRow label="Gastos comunes" value={formatARS(close.totalCommonExpenses)} />
                 <StatRow label="Inversion disponible" value={formatARS(close.availableInvestmentAmount ?? close.investmentAmount)} />
+                <StatRow label="Objetivos" value={formatARS(close.goalsAmount ?? 0)} />
                 <StatRow label={`${marcosName} disponible`} value={formatARS(close.availablePersonalAmountMarcos ?? close.finalPersonalAmountMarcos)} />
                 <StatRow label={`${wifeName} disponible`} value={formatARS(close.availablePersonalAmountWife ?? close.finalPersonalAmountWife)} />
-                <StatRow label="Fondo restante" value={formatARS(close.remainingCommonFund)} />
+                <StatRow label="Fondo comun disponible" value={formatARS(close.remainingCommonFund)} />
               </View>
             ))
         ) : (
