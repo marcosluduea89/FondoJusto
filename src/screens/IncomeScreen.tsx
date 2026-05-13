@@ -1,6 +1,7 @@
 import { Alert, StyleSheet, View } from "react-native";
 import { useMemo, useState } from "react";
 import { Card } from "../components/Card";
+import { DateSelector } from "../components/DateSelector";
 import { MonthSelector } from "../components/MonthSelector";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
@@ -45,6 +46,11 @@ export function IncomeScreen() {
     setDescription("");
     setAmount("");
     setDate(getTodayISODate());
+  };
+
+  const changeDate = (nextDate: string) => {
+    setDate(nextDate);
+    setSelectedMonth(nextDate.slice(0, 7));
   };
 
   const editIncome = (income: Income) => {
@@ -131,7 +137,7 @@ export function IncomeScreen() {
           placeholder="Ej: 1.200.000"
           value={amount}
         />
-        <TextInputField label="Fecha" onChangeText={setDate} placeholder="YYYY-MM-DD" value={date} />
+        <DateSelector label="Fecha" onChange={changeDate} value={date} />
         <PrimaryButton label={editingIncomeId ? "Actualizar ingreso" : "Guardar ingreso"} onPress={saveIncome} />
         {editingIncomeId && <PrimaryButton label="Cancelar edicion" onPress={resetForm} variant="secondary" />}
       </Card>

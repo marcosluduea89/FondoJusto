@@ -22,9 +22,12 @@ export function StatRow({ label, value, tone = "default" }: StatRowProps) {
 const styles = StyleSheet.create({
   row: {
     alignItems: "center",
+    borderBottomColor: colors.softBorder,
+    borderBottomWidth: 1,
     flexDirection: "row",
+    gap: 12,
     justifyContent: "space-between",
-    gap: 12
+    paddingVertical: 4
   },
   label: {
     color: colors.muted,

@@ -9,11 +9,16 @@ export function Card({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   card: {
-    gap: 10,
-    padding: 14,
     backgroundColor: colors.surface,
-    borderColor: colors.border,
+    borderColor: colors.softBorder,
     borderRadius: 8,
-    borderWidth: 1
+    borderWidth: 1,
+    elevation: 2,
+    gap: 12,
+    padding: 16,
+    shadowColor: "#000000",
+    shadowOffset: { height: 2, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8
   }
 });

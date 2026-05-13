@@ -46,16 +46,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     color: colors.text,
     fontSize: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 11
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 12
   },
   multiline: {
     minHeight: 140,
     textAlignVertical: "top"
   },
   label: {
-    color: colors.text,
+    color: colors.muted,
     fontSize: 14,
-    fontWeight: "700"
+    fontWeight: "800"
   }
 });

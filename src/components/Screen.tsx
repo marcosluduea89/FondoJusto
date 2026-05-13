@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
 
 interface ScreenProps {
@@ -11,9 +12,11 @@ interface ScreenProps {
 // Contenedor comun de pantalla con titulo, scroll y estado de carga.
 export function Screen({ title, isLoading, children }: ScreenProps) {
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>{title}</Text>
+        </View>
         {isLoading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.primary} />
@@ -35,12 +38,20 @@ const styles = StyleSheet.create({
   content: {
     gap: 16,
     padding: 16,
-    paddingBottom: 32
+    paddingTop: 14,
+    paddingBottom: 48
+  },
+  header: {
+    borderLeftColor: colors.primary,
+    borderLeftWidth: 4,
+    paddingLeft: 12,
+    paddingVertical: 2
   },
   title: {
     color: colors.text,
-    fontSize: 26,
-    fontWeight: "800"
+    fontSize: 28,
+    fontWeight: "900",
+    lineHeight: 34
   },
   loading: {
     alignItems: "center",

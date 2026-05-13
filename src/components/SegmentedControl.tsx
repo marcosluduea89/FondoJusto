@@ -48,16 +48,18 @@ const styles = StyleSheet.create({
     gap: 8
   },
   label: {
-    color: colors.text,
+    color: colors.muted,
     fontSize: 14,
-    fontWeight: "700"
+    fontWeight: "800"
   },
   option: {
     alignItems: "center",
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     flexGrow: 1,
+    minHeight: 42,
     paddingHorizontal: 10,
     paddingVertical: 10
   },

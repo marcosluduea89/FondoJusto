@@ -1,6 +1,7 @@
 import { Alert, StyleSheet, View } from "react-native";
 import { useMemo, useState } from "react";
 import { Card } from "../components/Card";
+import { DateSelector } from "../components/DateSelector";
 import { MonthSelector } from "../components/MonthSelector";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
@@ -52,6 +53,11 @@ export function ExpenseScreen() {
     setPaymentSource("common_fund");
     setIsCommonExpense("yes");
     setDate(getTodayISODate());
+  };
+
+  const changeDate = (nextDate: string) => {
+    setDate(nextDate);
+    setSelectedMonth(nextDate.slice(0, 7));
   };
 
   const changeCategory = (nextCategory: ExpenseCategory) => {
@@ -175,7 +181,7 @@ export function ExpenseScreen() {
           ]}
           value={isCommonExpense}
         />
-        <TextInputField label="Fecha" onChangeText={setDate} placeholder="YYYY-MM-DD" value={date} />
+        <DateSelector label="Fecha" onChange={changeDate} value={date} />
         <PrimaryButton label={editingExpenseId ? "Actualizar gasto" : "Guardar gasto"} onPress={saveExpense} />
         {editingExpenseId && <PrimaryButton label="Cancelar edicion" onPress={resetForm} variant="secondary" />}
       </Card>
