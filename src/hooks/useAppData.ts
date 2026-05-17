@@ -9,6 +9,7 @@ import { getCurrentMonthKey, isFutureMonth } from "../utils/dates";
 interface UseAppDataResult {
   data: AppData | null;
   isLoading: boolean;
+  syncStatus: SyncStatus;
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
   addIncome: (income: Income) => Promise<void>;
@@ -34,13 +35,34 @@ interface UseAppDataResult {
   getMonthStatus: (month: string) => MonthState["status"];
 }
 
+export type SyncState = "idle" | "loading" | "saving" | "synced" | "error";
+
+export interface SyncStatus {
+  state: SyncState;
+  isCloudEnabled: boolean;
+  lastUpdatedAt: string | null;
+  errorMessage: string | null;
+}
+
 // Hook central de estado: las pantallas leen y escriben datos desde un unico punto.
 export function useAppData(householdId?: string): UseAppDataResult {
   const [data, setData] = useState<AppData | null>(null);
+  const dataRef = useRef<AppData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+    state: householdId ? "loading" : "idle",
+    isCloudEnabled: Boolean(householdId),
+    lastUpdatedAt: null,
+    errorMessage: null
+  });
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
   const autoClosuresApplied = useRef(false);
   const realtimeReloadTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateDataState = useCallback((nextData: AppData) => {
+    dataRef.current = nextData;
+    setData(nextData);
+  }, []);
 
   function shouldAutoCloseMonth(month: string, closeDay: number): boolean {
     const today = new Date();
@@ -55,14 +77,72 @@ export function useAppData(householdId?: string): UseAppDataResult {
 
   const persist = useCallback(
     async (nextData: AppData) => {
-      setData(nextData);
-      await localRepository.save(nextData);
+      updateDataState(nextData);
+      setSyncStatus((current) => ({
+        ...current,
+        state: householdId ? "saving" : "synced",
+        isCloudEnabled: Boolean(householdId),
+        errorMessage: null
+      }));
 
-      if (householdId) {
-        await createSupabaseRepository(householdId).save(nextData);
+      try {
+        await localRepository.save(nextData);
+
+        if (householdId) {
+          await createSupabaseRepository(householdId).save(nextData);
+        }
+
+        setSyncStatus({
+          state: "synced",
+          isCloudEnabled: Boolean(householdId),
+          lastUpdatedAt: new Date().toISOString(),
+          errorMessage: null
+        });
+      } catch (error) {
+        setSyncStatus((current) => ({
+          ...current,
+          state: "error",
+          isCloudEnabled: Boolean(householdId),
+          errorMessage: error instanceof Error ? error.message : "No se pudo sincronizar."
+        }));
       }
     },
-    [householdId]
+    [householdId, updateDataState]
+  );
+
+  const persistEntityChange = useCallback(
+    async (nextData: AppData, saveEntity: (repository: ReturnType<typeof createSupabaseRepository>) => Promise<void>) => {
+      updateDataState(nextData);
+      setSyncStatus((current) => ({
+        ...current,
+        state: householdId ? "saving" : "synced",
+        isCloudEnabled: Boolean(householdId),
+        errorMessage: null
+      }));
+
+      try {
+        await localRepository.save(nextData);
+
+        if (householdId) {
+          await saveEntity(createSupabaseRepository(householdId));
+        }
+
+        setSyncStatus({
+          state: "synced",
+          isCloudEnabled: Boolean(householdId),
+          lastUpdatedAt: new Date().toISOString(),
+          errorMessage: null
+        });
+      } catch (error) {
+        setSyncStatus((current) => ({
+          ...current,
+          state: "error",
+          isCloudEnabled: Boolean(householdId),
+          errorMessage: error instanceof Error ? error.message : "No se pudo sincronizar."
+        }));
+      }
+    },
+    [householdId, updateDataState]
   );
 
   const applyAutomaticClosures = useCallback(
@@ -113,22 +193,45 @@ export function useAppData(householdId?: string): UseAppDataResult {
 
   useEffect(() => {
     setIsLoading(true);
+    setSyncStatus((current) => ({
+      ...current,
+      state: householdId ? "loading" : "idle",
+      isCloudEnabled: Boolean(householdId),
+      errorMessage: null
+    }));
     autoClosuresApplied.current = false;
 
     localRepository.load().then(async (localData) => {
-      const loadedData = householdId
-        ? (await createSupabaseRepository(householdId).load(localData)).data
-        : localData;
+      try {
+        const loadedData = householdId
+          ? (await createSupabaseRepository(householdId).load(localData)).data
+          : localData;
 
-      await localRepository.save(loadedData);
-      setData(loadedData);
-      setIsLoading(false);
-      if (!autoClosuresApplied.current) {
-        autoClosuresApplied.current = true;
-        await applyAutomaticClosures(loadedData);
+        await localRepository.save(loadedData);
+        updateDataState(loadedData);
+        setSyncStatus({
+          state: "synced",
+          isCloudEnabled: Boolean(householdId),
+          lastUpdatedAt: new Date().toISOString(),
+          errorMessage: null
+        });
+        setIsLoading(false);
+        if (!autoClosuresApplied.current) {
+          autoClosuresApplied.current = true;
+          await applyAutomaticClosures(loadedData);
+        }
+      } catch (error) {
+        updateDataState(localData);
+        setSyncStatus((current) => ({
+          ...current,
+          state: "error",
+          isCloudEnabled: Boolean(householdId),
+          errorMessage: error instanceof Error ? error.message : "No se pudo cargar la nube."
+        }));
+        setIsLoading(false);
       }
     });
-  }, [applyAutomaticClosures, householdId]);
+  }, [applyAutomaticClosures, householdId, updateDataState]);
 
   useEffect(() => {
     if (!householdId) return;
@@ -139,10 +242,31 @@ export function useAppData(householdId?: string): UseAppDataResult {
       }
 
       realtimeReloadTimeout.current = setTimeout(() => {
+        setSyncStatus((current) => ({
+          ...current,
+          state: "loading",
+          isCloudEnabled: true,
+          errorMessage: null
+        }));
         localRepository.load().then(async (localData) => {
-          const cloudData = (await createSupabaseRepository(householdId).load(localData)).data;
-          await localRepository.save(cloudData);
-          setData(cloudData);
+          try {
+            const cloudData = (await createSupabaseRepository(householdId).load(localData)).data;
+            await localRepository.save(cloudData);
+            updateDataState(cloudData);
+            setSyncStatus({
+              state: "synced",
+              isCloudEnabled: true,
+              lastUpdatedAt: new Date().toISOString(),
+              errorMessage: null
+            });
+          } catch (error) {
+            setSyncStatus((current) => ({
+              ...current,
+              state: "error",
+              isCloudEnabled: true,
+              errorMessage: error instanceof Error ? error.message : "No se pudo actualizar desde la nube."
+            }));
+          }
         });
       }, 500);
     };
@@ -174,114 +298,136 @@ export function useAppData(householdId?: string): UseAppDataResult {
       }
       supabase.removeChannel(channel);
     };
-  }, [householdId]);
+  }, [householdId, updateDataState]);
 
   const addIncome = useCallback(
     async (income: Income) => {
-      if (!data) return;
-      await persist({ ...data, incomes: [...data.incomes, income] });
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      await persistEntityChange({ ...currentData, incomes: [...currentData.incomes, income] }, (repository) =>
+        repository.upsertIncome(income)
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const updateIncome = useCallback(
     async (income: Income) => {
-      if (!data) return;
-      await persist({
-        ...data,
-        incomes: data.incomes.map((item) => (item.id === income.id ? income : item))
-      });
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      await persistEntityChange(
+        {
+          ...currentData,
+          incomes: currentData.incomes.map((item) => (item.id === income.id ? income : item))
+        },
+        (repository) => repository.upsertIncome(income)
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const deleteIncome = useCallback(
     async (incomeId: string) => {
-      if (!data) return;
-      await persist({ ...data, incomes: data.incomes.filter((income) => income.id !== incomeId) });
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      await persistEntityChange(
+        { ...currentData, incomes: currentData.incomes.filter((income) => income.id !== incomeId) },
+        (repository) => repository.deleteIncome(incomeId)
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const addExpense = useCallback(
     async (expense: Expense) => {
-      if (!data) return;
-      await persist({ ...data, expenses: [...data.expenses, expense] });
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      await persistEntityChange({ ...currentData, expenses: [...currentData.expenses, expense] }, (repository) =>
+        repository.upsertExpense(expense)
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const updateExpense = useCallback(
     async (expense: Expense) => {
-      if (!data) return;
-      await persist({
-        ...data,
-        expenses: data.expenses.map((item) => (item.id === expense.id ? expense : item))
-      });
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      await persistEntityChange(
+        {
+          ...currentData,
+          expenses: currentData.expenses.map((item) => (item.id === expense.id ? expense : item))
+        },
+        (repository) => repository.upsertExpense(expense)
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const deleteExpense = useCallback(
     async (expenseId: string) => {
-      if (!data) return;
-      await persist({
-        ...data,
-        expenses: data.expenses.filter((expense) => expense.id !== expenseId),
-        reimbursements: data.reimbursements.filter(
-          (reimbursement) => reimbursement.originalExpenseId !== expenseId
-        )
-      });
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      await persistEntityChange(
+        {
+          ...currentData,
+          expenses: currentData.expenses.filter((expense) => expense.id !== expenseId),
+          reimbursements: currentData.reimbursements.filter((reimbursement) => reimbursement.originalExpenseId !== expenseId)
+        },
+        (repository) => repository.deleteExpense(expenseId)
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const updatePersonName = useCallback(
     async (personId: PersonId, name: string) => {
-      if (!data) return;
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      const people = currentData.people.map((person) =>
+        person.id === personId ? { ...person, name: name.trim() || person.name } : person
+      );
 
-      await persist({
-        ...data,
-        people: data.people.map((person) =>
-          person.id === personId ? { ...person, name: name.trim() || person.name } : person
-        )
-      });
+      await persistEntityChange({ ...currentData, people }, (repository) => repository.upsertPeople(people));
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const updatePersonNames = useCallback(
     async (names: Partial<Record<PersonId, string>>) => {
-      if (!data) return;
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      const people = currentData.people.map((person) => ({
+        ...person,
+        name: names[person.id]?.trim() || person.name
+      }));
 
-      await persist({
-        ...data,
-        people: data.people.map((person) => ({
-          ...person,
-          name: names[person.id]?.trim() || person.name
-        }))
-      });
+      await persistEntityChange({ ...currentData, people }, (repository) => repository.upsertPeople(people));
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const saveMonthlyConfig = useCallback(
     async (config: MonthlyConfig) => {
-      if (!data) return;
+      const currentData = dataRef.current;
+      if (!currentData) return;
 
-      const otherConfigs = data.monthlyConfigs.filter((item) => item.month !== config.month);
-      await persist({ ...data, monthlyConfigs: [...otherConfigs, config] });
+      const otherConfigs = currentData.monthlyConfigs.filter((item) => item.month !== config.month);
+      await persistEntityChange({ ...currentData, monthlyConfigs: [...otherConfigs, config] }, (repository) =>
+        repository.upsertMonthlyConfig(config)
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const saveGoals = useCallback(
     async (goals: Goal[]) => {
-      if (!data) return;
+      const currentData = dataRef.current;
+      if (!currentData) return;
 
-      await persist({ ...data, goals });
+      await persistEntityChange({ ...currentData, goals }, (repository) => repository.upsertGoals(goals));
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const saveAppSettings = useCallback(
@@ -291,54 +437,61 @@ export function useAppData(householdId?: string): UseAppDataResult {
       estimatedMonthlyIncome: number,
       basicBasketAmount: number
     ) => {
-      if (!data) return;
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      const appSettings = {
+        closeDay,
+        discountPersonalOverages,
+        estimatedMonthlyIncome,
+        basicBasketAmount
+      };
 
-      await persist({
-        ...data,
-        appSettings: {
-          closeDay,
-          discountPersonalOverages,
-          estimatedMonthlyIncome,
-          basicBasketAmount
-        }
-      });
+      await persistEntityChange({ ...currentData, appSettings }, (repository) => repository.upsertAppSettings(appSettings));
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const performMonthlyClose = useCallback(
     async (month: string) => {
-      if (!data) return;
+      const currentData = dataRef.current;
+      if (!currentData) return;
 
-      const result = closeMonth(data, month);
-      const closesWithoutMonth = data.monthlyCloses.filter((close) => close.month !== month);
+      const result = closeMonth(currentData, month);
+      const closesWithoutMonth = currentData.monthlyCloses.filter((close) => close.month !== month);
+      const monthState = { month, status: "closed" as const, closedAt: new Date().toISOString() };
 
-      await persist({
-        ...data,
-        reimbursements: result.reimbursements,
-        monthlyCloses: [...closesWithoutMonth, result.close],
-        monthStates: [
-          ...data.monthStates.filter((state) => state.month !== month),
-          { month, status: "closed" as const, closedAt: new Date().toISOString() }
-        ]
-      });
+      await persistEntityChange(
+        {
+          ...currentData,
+          reimbursements: result.reimbursements,
+          monthlyCloses: [...closesWithoutMonth, result.close],
+          monthStates: [...currentData.monthStates.filter((state) => state.month !== month), monthState]
+        },
+        async (repository) => {
+          await repository.upsertReimbursements(result.reimbursements);
+          await repository.upsertMonthlyClose(result.close);
+          await repository.upsertMonthState(monthState);
+        }
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const reopenMonth = useCallback(
     async (month: string) => {
-      if (!data) return;
+      const currentData = dataRef.current;
+      if (!currentData) return;
+      const monthState = { month, status: "reopened" as const, reopenedAt: new Date().toISOString() };
 
-      await persist({
-        ...data,
-        monthStates: [
-          ...data.monthStates.filter((state) => state.month !== month),
-          { month, status: "reopened" as const, reopenedAt: new Date().toISOString() }
-        ]
-      });
+      await persistEntityChange(
+        {
+          ...currentData,
+          monthStates: [...currentData.monthStates.filter((state) => state.month !== month), monthState]
+        },
+        (repository) => repository.upsertMonthState(monthState)
+      );
     },
-    [data, persist]
+    [persistEntityChange]
   );
 
   const importData = useCallback(
@@ -363,6 +516,7 @@ export function useAppData(householdId?: string): UseAppDataResult {
     () => ({
       data,
       isLoading,
+      syncStatus,
       selectedMonth,
       setSelectedMonth,
       addIncome,
@@ -398,6 +552,7 @@ export function useAppData(householdId?: string): UseAppDataResult {
       saveGoals,
       saveMonthlyConfig,
       selectedMonth,
+      syncStatus,
       updateExpense,
       updateIncome,
       updatePersonName,

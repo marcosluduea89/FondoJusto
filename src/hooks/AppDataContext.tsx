@@ -22,3 +22,7 @@ export function useAppDataContext(): AppDataContextValue {
 
   return context;
 }
+
+export function useOptionalAppDataContext(): AppDataContextValue | null {
+  return useContext(AppDataContext);
+}

@@ -1,4 +1,15 @@
-import { AppData, Expense, Goal, Income, MonthlyClose, MonthlyConfig, MonthState, Person, Reimbursement } from "../models";
+import {
+  AppData,
+  AppSettings,
+  Expense,
+  Goal,
+  Income,
+  MonthlyClose,
+  MonthlyConfig,
+  MonthState,
+  Person,
+  Reimbursement
+} from "../models";
 import { DEFAULT_GOALS } from "../models/goal";
 import { PEOPLE } from "../models/person";
 import { supabase } from "../services/supabase";
@@ -52,6 +63,109 @@ function requireNoError(error: unknown): void {
 async function deleteHouseholdRows(table: string, householdId: string): Promise<void> {
   const { error } = await supabase.from(table).delete().eq("household_id", householdId);
   requireNoError(error);
+}
+
+function toIncomeRow(householdId: string, income: Income) {
+  return {
+    household_id: householdId,
+    local_id: income.id,
+    month: income.month,
+    person_id: income.personId,
+    description: income.description,
+    amount: income.amount,
+    date: income.date
+  };
+}
+
+function toExpenseRow(householdId: string, expense: Expense) {
+  return {
+    household_id: householdId,
+    local_id: expense.id,
+    month: expense.month,
+    category: expense.category,
+    description: expense.description,
+    amount: expense.amount,
+    paid_by: expense.paidBy,
+    payment_source: expense.paymentSource,
+    is_common_expense: expense.isCommonExpense,
+    date: expense.date
+  };
+}
+
+function toPersonRow(householdId: string, person: Person) {
+  return {
+    household_id: householdId,
+    person_id: person.id,
+    name: person.name
+  };
+}
+
+function toGoalRow(householdId: string, goal: Goal) {
+  return {
+    household_id: householdId,
+    local_id: goal.id,
+    name: goal.name,
+    current_amount: goal.currentAmount,
+    target_amount: goal.targetAmount,
+    allocation_percentage: goal.allocationPercentage
+  };
+}
+
+function toMonthlyConfigRow(householdId: string, config: MonthlyConfig) {
+  return {
+    household_id: householdId,
+    month: config.month,
+    investment_percentage: config.investmentPercentage,
+    goals_percentage: config.goalsPercentage,
+    personal_percentage_marcos: config.personalPercentageMarcos,
+    personal_percentage_wife: config.personalPercentageWife
+  };
+}
+
+function toMonthlyCloseRow(householdId: string, close: MonthlyClose) {
+  return {
+    household_id: householdId,
+    month: close.month,
+    snapshot: close
+  };
+}
+
+function toMonthStateRow(householdId: string, state: MonthState) {
+  return {
+    household_id: householdId,
+    month: state.month,
+    status: state.status,
+    closed_at: state.closedAt ?? null,
+    reopened_at: state.reopenedAt ?? null
+  };
+}
+
+function toAppSettingsRow(householdId: string, settings: AppSettings) {
+  return {
+    household_id: householdId,
+    close_day: settings.closeDay,
+    discount_personal_overages: settings.discountPersonalOverages,
+    estimated_monthly_income: settings.estimatedMonthlyIncome,
+    basic_basket_amount: settings.basicBasketAmount
+  };
+}
+
+function toReimbursementRow(householdId: string, reimbursement: Reimbursement) {
+  return {
+    household_id: householdId,
+    local_id: reimbursement.id,
+    expense_id: reimbursement.originalExpenseId,
+    original_expense_id: reimbursement.originalExpenseId,
+    from_person_id: reimbursement.personId,
+    to_person_id: reimbursement.personId,
+    person_id: reimbursement.personId,
+    amount: reimbursement.amount,
+    month: reimbursement.targetMonth,
+    source_month: reimbursement.sourceMonth,
+    target_month: reimbursement.targetMonth,
+    status: reimbursement.status,
+    applied_month: reimbursement.appliedMonth ?? null
+  };
 }
 
 export function createSupabaseRepository(householdId: string) {
@@ -205,123 +319,134 @@ export function createSupabaseRepository(householdId: string) {
       ]);
 
       const settingsResult = await supabase.from("app_settings").upsert(
-        {
-          household_id: householdId,
-          close_day: normalizedData.appSettings.closeDay,
-          discount_personal_overages: normalizedData.appSettings.discountPersonalOverages,
-          estimated_monthly_income: normalizedData.appSettings.estimatedMonthlyIncome,
-          basic_basket_amount: normalizedData.appSettings.basicBasketAmount
-        },
+        toAppSettingsRow(householdId, normalizedData.appSettings),
         { onConflict: "household_id" }
       );
       requireNoError(settingsResult.error);
 
       const inserts = [
         normalizedData.people.length
-          ? supabase.from("household_people").insert(
-              normalizedData.people.map((person) => ({
-                household_id: householdId,
-                person_id: person.id,
-                name: person.name
-              }))
-            )
+          ? supabase.from("household_people").insert(normalizedData.people.map((person) => toPersonRow(householdId, person)))
           : Promise.resolve({ error: null }),
         normalizedData.incomes.length
-          ? supabase.from("incomes").insert(
-              normalizedData.incomes.map((income) => ({
-                household_id: householdId,
-                local_id: income.id,
-                month: income.month,
-                person_id: income.personId,
-                description: income.description,
-                amount: income.amount,
-                date: income.date
-              }))
-            )
+          ? supabase.from("incomes").insert(normalizedData.incomes.map((income) => toIncomeRow(householdId, income)))
           : Promise.resolve({ error: null }),
         normalizedData.expenses.length
-          ? supabase.from("expenses").insert(
-              normalizedData.expenses.map((expense) => ({
-                household_id: householdId,
-                local_id: expense.id,
-                month: expense.month,
-                category: expense.category,
-                description: expense.description,
-                amount: expense.amount,
-                paid_by: expense.paidBy,
-                payment_source: expense.paymentSource,
-                is_common_expense: expense.isCommonExpense,
-                date: expense.date
-              }))
-            )
+          ? supabase.from("expenses").insert(normalizedData.expenses.map((expense) => toExpenseRow(householdId, expense)))
           : Promise.resolve({ error: null }),
         normalizedData.reimbursements.length
           ? supabase.from("reimbursements").insert(
-              normalizedData.reimbursements.map((reimbursement) => ({
-                household_id: householdId,
-                local_id: reimbursement.id,
-                expense_id: reimbursement.originalExpenseId,
-                original_expense_id: reimbursement.originalExpenseId,
-                from_person_id: reimbursement.personId,
-                to_person_id: reimbursement.personId,
-                person_id: reimbursement.personId,
-                amount: reimbursement.amount,
-                month: reimbursement.targetMonth,
-                source_month: reimbursement.sourceMonth,
-                target_month: reimbursement.targetMonth,
-                status: reimbursement.status,
-                applied_month: reimbursement.appliedMonth ?? null
-              }))
+              normalizedData.reimbursements.map((reimbursement) => toReimbursementRow(householdId, reimbursement))
             )
           : Promise.resolve({ error: null }),
         normalizedData.goals.length
-          ? supabase.from("goals").insert(
-              normalizedData.goals.map((goal) => ({
-                household_id: householdId,
-                local_id: goal.id,
-                name: goal.name,
-                current_amount: goal.currentAmount,
-                target_amount: goal.targetAmount,
-                allocation_percentage: goal.allocationPercentage
-              }))
-            )
+          ? supabase.from("goals").insert(normalizedData.goals.map((goal) => toGoalRow(householdId, goal)))
           : Promise.resolve({ error: null }),
         normalizedData.monthlyConfigs.length
-          ? supabase.from("monthly_configs").insert(
-              normalizedData.monthlyConfigs.map((config) => ({
-                household_id: householdId,
-                month: config.month,
-                investment_percentage: config.investmentPercentage,
-                goals_percentage: config.goalsPercentage,
-                personal_percentage_marcos: config.personalPercentageMarcos,
-                personal_percentage_wife: config.personalPercentageWife
-              }))
-            )
+          ? supabase
+              .from("monthly_configs")
+              .insert(normalizedData.monthlyConfigs.map((config) => toMonthlyConfigRow(householdId, config)))
           : Promise.resolve({ error: null }),
         normalizedData.monthlyCloses.length
-          ? supabase.from("monthly_closes").insert(
-              normalizedData.monthlyCloses.map((close) => ({
-                household_id: householdId,
-                month: close.month,
-                snapshot: close
-              }))
-            )
+          ? supabase
+              .from("monthly_closes")
+              .insert(normalizedData.monthlyCloses.map((close) => toMonthlyCloseRow(householdId, close)))
           : Promise.resolve({ error: null }),
         normalizedData.monthStates.length
-          ? supabase.from("month_states").insert(
-              normalizedData.monthStates.map((state) => ({
-                household_id: householdId,
-                month: state.month,
-                status: state.status,
-                closed_at: state.closedAt ?? null,
-                reopened_at: state.reopenedAt ?? null
-              }))
-            )
+          ? supabase.from("month_states").insert(normalizedData.monthStates.map((state) => toMonthStateRow(householdId, state)))
           : Promise.resolve({ error: null })
       ];
 
       const results = await Promise.all(inserts);
       results.map((result) => result.error).forEach(requireNoError);
+    },
+
+    async upsertIncome(income: Income): Promise<void> {
+      const { error } = await supabase
+        .from("incomes")
+        .upsert(toIncomeRow(householdId, income), { onConflict: "household_id,local_id" });
+      requireNoError(error);
+    },
+
+    async deleteIncome(incomeId: string): Promise<void> {
+      const { error } = await supabase.from("incomes").delete().eq("household_id", householdId).eq("local_id", incomeId);
+      requireNoError(error);
+    },
+
+    async upsertExpense(expense: Expense): Promise<void> {
+      const { error } = await supabase
+        .from("expenses")
+        .upsert(toExpenseRow(householdId, expense), { onConflict: "household_id,local_id" });
+      requireNoError(error);
+    },
+
+    async deleteExpense(expenseId: string): Promise<void> {
+      const reimbursementDelete = await supabase
+        .from("reimbursements")
+        .delete()
+        .eq("household_id", householdId)
+        .or(`original_expense_id.eq.${expenseId},expense_id.eq.${expenseId}`);
+      requireNoError(reimbursementDelete.error);
+
+      const expenseDelete = await supabase.from("expenses").delete().eq("household_id", householdId).eq("local_id", expenseId);
+      requireNoError(expenseDelete.error);
+    },
+
+    async upsertPeople(people: Person[]): Promise<void> {
+      if (!people.length) return;
+
+      const { error } = await supabase
+        .from("household_people")
+        .upsert(people.map((person) => toPersonRow(householdId, person)), { onConflict: "household_id,person_id" });
+      requireNoError(error);
+    },
+
+    async upsertGoals(goals: Goal[]): Promise<void> {
+      if (!goals.length) return;
+
+      const { error } = await supabase
+        .from("goals")
+        .upsert(goals.map((goal) => toGoalRow(householdId, goal)), { onConflict: "household_id,local_id" });
+      requireNoError(error);
+    },
+
+    async upsertMonthlyConfig(config: MonthlyConfig): Promise<void> {
+      const { error } = await supabase
+        .from("monthly_configs")
+        .upsert(toMonthlyConfigRow(householdId, config), { onConflict: "household_id,month" });
+      requireNoError(error);
+    },
+
+    async upsertAppSettings(settings: AppSettings): Promise<void> {
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert(toAppSettingsRow(householdId, settings), { onConflict: "household_id" });
+      requireNoError(error);
+    },
+
+    async upsertMonthlyClose(close: MonthlyClose): Promise<void> {
+      const { error } = await supabase
+        .from("monthly_closes")
+        .upsert(toMonthlyCloseRow(householdId, close), { onConflict: "household_id,month" });
+      requireNoError(error);
+    },
+
+    async upsertMonthState(state: MonthState): Promise<void> {
+      const { error } = await supabase
+        .from("month_states")
+        .upsert(toMonthStateRow(householdId, state), { onConflict: "household_id,month" });
+      requireNoError(error);
+    },
+
+    async upsertReimbursements(reimbursements: Reimbursement[]): Promise<void> {
+      if (!reimbursements.length) return;
+
+      const { error } = await supabase
+        .from("reimbursements")
+        .upsert(reimbursements.map((reimbursement) => toReimbursementRow(householdId, reimbursement)), {
+          onConflict: "household_id,local_id"
+        });
+      requireNoError(error);
     }
   };
 }
