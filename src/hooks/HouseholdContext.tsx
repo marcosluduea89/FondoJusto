@@ -9,12 +9,21 @@ interface Household {
 
 interface HouseholdContextValue {
   createHousehold: (name: string) => Promise<void>;
+  createInviteCode: () => Promise<string>;
   household: Household | null;
   isLoading: boolean;
+  joinHousehold: (code: string) => Promise<void>;
   refreshHousehold: () => Promise<void>;
 }
 
 const HouseholdContext = createContext<HouseholdContextValue | null>(null);
+
+function createCode(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const pieces = Array.from({ length: 8 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]);
+
+  return `${pieces.slice(0, 4).join("")}-${pieces.slice(4).join("")}`;
+}
 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
   const { user } = useAuthContext();
@@ -86,11 +95,37 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     setHousehold({ id: newHousehold.id, name: newHousehold.name });
   };
 
+  const createInviteCode = async (): Promise<string> => {
+    if (!user || !household) return "";
+
+    const code = createCode();
+    const { error } = await supabase.from("household_invites").insert({
+      code,
+      created_by: user.id,
+      household_id: household.id
+    });
+
+    if (error) throw error;
+
+    return code;
+  };
+
+  const joinHousehold = async (code: string) => {
+    const normalizedCode = code.trim().toUpperCase();
+    const { error } = await supabase.rpc("join_household", { invite_code: normalizedCode });
+
+    if (error) throw error;
+
+    await refreshHousehold();
+  };
+
   const value = useMemo<HouseholdContextValue>(
     () => ({
       createHousehold,
+      createInviteCode,
       household,
       isLoading,
+      joinHousehold,
       refreshHousehold
     }),
     [household, isLoading, user?.id]

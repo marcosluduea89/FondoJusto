@@ -34,7 +34,7 @@ export function ConfigScreen() {
     updatePersonNames
   } = useAppDataContext();
   const { signOut, user } = useAuthContext();
-  const { household } = useHouseholdContext();
+  const { createInviteCode, household } = useHouseholdContext();
 
   const config = useMemo(
     () => (data ? getMonthlyConfig(data.monthlyConfigs, selectedMonth) : null),
@@ -50,6 +50,7 @@ export function ConfigScreen() {
   const [estimatedMonthlyIncome, setEstimatedMonthlyIncome] = useState("");
   const [basicBasketAmount, setBasicBasketAmount] = useState("1.370.000");
   const [discountPersonalOverages, setDiscountPersonalOverages] = useState<"yes" | "no">("yes");
+  const [inviteCode, setInviteCode] = useState("");
   const [goalInputs, setGoalInputs] = useState(
     DEFAULT_GOALS.map((goal) => ({
       id: goal.id,
@@ -291,12 +292,25 @@ export function ConfigScreen() {
     ]);
   };
 
+  const generateInviteCode = async () => {
+    try {
+      const code = await createInviteCode();
+      setInviteCode(code);
+      Alert.alert("Codigo creado", `Compartilo con la otra persona: ${code}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo crear el codigo.";
+      Alert.alert("Supabase", message);
+    }
+  };
+
   return (
     <Screen isLoading={isLoading} title="Configuracion mensual">
       <Card>
         <Text style={styles.sectionTitle}>Cuenta</Text>
         <StatRow label="Usuario" value={user?.email ?? "Sin email"} />
         <StatRow label="Hogar" value={household?.name ?? "Sin hogar"} />
+        {inviteCode ? <StatRow label="Codigo invitacion" value={inviteCode} /> : null}
+        <PrimaryButton label="Invitar pareja" onPress={generateInviteCode} variant="secondary" />
         <PrimaryButton label="Cerrar sesion" onPress={closeSession} variant="secondary" />
       </Card>
 
