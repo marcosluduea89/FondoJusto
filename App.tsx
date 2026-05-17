@@ -21,7 +21,7 @@ function AuthenticatedRoot() {
   }
 
   return (
-    <AppDataProvider>
+    <AppDataProvider householdId={household.id}>
       <NavigationContainer>
         <StatusBar style="dark" />
         <AppNavigator />

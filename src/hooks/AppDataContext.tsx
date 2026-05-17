@@ -6,8 +6,8 @@ type AppDataContextValue = ReturnType<typeof useAppData>;
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 // Provider global para que cualquier pantalla pueda leer y modificar los datos locales.
-export function AppDataProvider({ children }: { children: ReactNode }) {
-  const value = useAppData();
+export function AppDataProvider({ children, householdId }: { children: ReactNode; householdId?: string }) {
+  const value = useAppData(householdId);
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 }

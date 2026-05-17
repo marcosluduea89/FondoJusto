@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppData, Expense, Goal, Income, MonthlyConfig, MonthState, PersonId } from "../models";
 import { closeMonth } from "../services/finance";
+import { supabase } from "../services/supabase";
 import { localRepository } from "../storage/localRepository";
+import { createSupabaseRepository } from "../storage/supabaseRepository";
 import { getCurrentMonthKey, isFutureMonth } from "../utils/dates";
 
 interface UseAppDataResult {
@@ -33,11 +35,12 @@ interface UseAppDataResult {
 }
 
 // Hook central de estado: las pantallas leen y escriben datos desde un unico punto.
-export function useAppData(): UseAppDataResult {
+export function useAppData(householdId?: string): UseAppDataResult {
   const [data, setData] = useState<AppData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
   const autoClosuresApplied = useRef(false);
+  const realtimeReloadTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function shouldAutoCloseMonth(month: string, closeDay: number): boolean {
     const today = new Date();
@@ -50,10 +53,17 @@ export function useAppData(): UseAppDataResult {
     return today.getDate() >= closeDay;
   }
 
-  const persist = useCallback(async (nextData: AppData) => {
-    setData(nextData);
-    await localRepository.save(nextData);
-  }, []);
+  const persist = useCallback(
+    async (nextData: AppData) => {
+      setData(nextData);
+      await localRepository.save(nextData);
+
+      if (householdId) {
+        await createSupabaseRepository(householdId).save(nextData);
+      }
+    },
+    [householdId]
+  );
 
   const applyAutomaticClosures = useCallback(
     async (currentData: AppData) => {
@@ -102,7 +112,15 @@ export function useAppData(): UseAppDataResult {
   );
 
   useEffect(() => {
-    localRepository.load().then(async (loadedData) => {
+    setIsLoading(true);
+    autoClosuresApplied.current = false;
+
+    localRepository.load().then(async (localData) => {
+      const loadedData = householdId
+        ? (await createSupabaseRepository(householdId).load(localData)).data
+        : localData;
+
+      await localRepository.save(loadedData);
       setData(loadedData);
       setIsLoading(false);
       if (!autoClosuresApplied.current) {
@@ -110,7 +128,53 @@ export function useAppData(): UseAppDataResult {
         await applyAutomaticClosures(loadedData);
       }
     });
-  }, [applyAutomaticClosures]);
+  }, [applyAutomaticClosures, householdId]);
+
+  useEffect(() => {
+    if (!householdId) return;
+
+    const reloadFromCloud = () => {
+      if (realtimeReloadTimeout.current) {
+        clearTimeout(realtimeReloadTimeout.current);
+      }
+
+      realtimeReloadTimeout.current = setTimeout(() => {
+        localRepository.load().then(async (localData) => {
+          const cloudData = (await createSupabaseRepository(householdId).load(localData)).data;
+          await localRepository.save(cloudData);
+          setData(cloudData);
+        });
+      }, 500);
+    };
+
+    const channel = supabase.channel(`household-sync-${householdId}`);
+    [
+      "household_people",
+      "incomes",
+      "expenses",
+      "reimbursements",
+      "goals",
+      "monthly_configs",
+      "monthly_closes",
+      "month_states",
+      "app_settings"
+    ].forEach((table) => {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table, filter: `household_id=eq.${householdId}` },
+        reloadFromCloud
+      );
+    });
+
+    channel.subscribe();
+
+    return () => {
+      if (realtimeReloadTimeout.current) {
+        clearTimeout(realtimeReloadTimeout.current);
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [householdId]);
 
   const addIncome = useCallback(
     async (income: Income) => {
@@ -286,8 +350,8 @@ export function useAppData(): UseAppDataResult {
 
   const resetDemoData = useCallback(async () => {
     const resetData = await localRepository.reset();
-    setData(resetData);
-  }, []);
+    await persist(resetData);
+  }, [persist]);
 
   const getMonthStatus = useCallback(
     (month: string): MonthState["status"] =>
