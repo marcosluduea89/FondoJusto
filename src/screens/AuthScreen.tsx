@@ -38,7 +38,7 @@ export function AuthScreen() {
         await signUp(normalizedEmail, password);
         Alert.alert(
           "Cuenta creada",
-          "Si Supabase pide confirmacion por email, revisa tu correo antes de iniciar sesion."
+          "Revisa tu correo para confirmar la cuenta. El enlace deberia volver a abrir FondoJusto."
         );
       }
     } catch (error) {

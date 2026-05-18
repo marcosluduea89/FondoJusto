@@ -2,6 +2,7 @@
   "expo": {
     "name": "FondoJusto",
     "slug": "fondojusto",
+    "scheme": "fondojusto",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",

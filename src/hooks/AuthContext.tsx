@@ -1,5 +1,6 @@
 import { Session, User } from "@supabase/supabase-js";
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { AUTH_EMAIL_REDIRECT_URL } from "../services/authRedirect";
 import { supabase } from "../services/supabase";
 
 interface AuthContextValue {
@@ -47,7 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       },
       signUp: async (email: string, password: string) => {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: AUTH_EMAIL_REDIRECT_URL
+          }
+        });
         if (error) throw error;
       }
     }),

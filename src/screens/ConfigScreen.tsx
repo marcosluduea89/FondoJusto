@@ -1,4 +1,5 @@
-import { Alert, StyleSheet, Text } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card } from "../components/Card";
 import { MonthSelector } from "../components/MonthSelector";
@@ -34,7 +35,7 @@ export function ConfigScreen() {
     updatePersonNames
   } = useAppDataContext();
   const { signOut, user } = useAuthContext();
-  const { createInviteCode, household } = useHouseholdContext();
+  const { activeInvite, createInviteCode, household, members } = useHouseholdContext();
 
   const config = useMemo(
     () => (data ? getMonthlyConfig(data.monthlyConfigs, selectedMonth) : null),
@@ -50,7 +51,6 @@ export function ConfigScreen() {
   const [estimatedMonthlyIncome, setEstimatedMonthlyIncome] = useState("");
   const [basicBasketAmount, setBasicBasketAmount] = useState("1.370.000");
   const [discountPersonalOverages, setDiscountPersonalOverages] = useState<"yes" | "no">("yes");
-  const [inviteCode, setInviteCode] = useState("");
   const [goalInputs, setGoalInputs] = useState(
     DEFAULT_GOALS.map((goal) => ({
       id: goal.id,
@@ -295,7 +295,6 @@ export function ConfigScreen() {
   const generateInviteCode = async () => {
     try {
       const code = await createInviteCode();
-      setInviteCode(code);
       Alert.alert("Codigo creado", `Compartilo con la otra persona: ${code}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudo crear el codigo.";
@@ -303,15 +302,69 @@ export function ConfigScreen() {
     }
   };
 
+  const copyInviteCode = async () => {
+    if (!activeInvite?.code) return;
+
+    await Clipboard.setStringAsync(activeInvite.code);
+    Alert.alert("Codigo copiado", "Ya podes compartirlo con la otra persona.");
+  };
+
+  const formatInviteExpiry = (expiresAt: string): string =>
+    new Date(expiresAt).toLocaleDateString("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+
   return (
-    <Screen isLoading={isLoading} title="Configuracion mensual">
+    <Screen isLoading={isLoading} title="Ajustes">
       <Card>
-        <Text style={styles.sectionTitle}>Cuenta</Text>
-        <StatRow label="Usuario" value={user?.email ?? "Sin email"} />
-        <StatRow label="Hogar" value={household?.name ?? "Sin hogar"} />
-        {inviteCode ? <StatRow label="Codigo invitacion" value={inviteCode} /> : null}
-        <PrimaryButton label="Invitar pareja" onPress={generateInviteCode} variant="secondary" />
-        <PrimaryButton label="Cerrar sesion" onPress={closeSession} variant="secondary" />
+        <Text style={styles.sectionTitle}>Cuenta y hogar</Text>
+        <View style={styles.accountBox}>
+          <Text style={styles.accountLabel}>Usuario logueado</Text>
+          <Text style={styles.accountValue}>{user?.email ?? "Sin email"}</Text>
+        </View>
+        <View style={styles.accountBox}>
+          <Text style={styles.accountLabel}>Hogar</Text>
+          <Text style={styles.accountValue}>{household?.name ?? "Sin hogar"}</Text>
+        </View>
+
+        <View style={styles.memberList}>
+          <Text style={styles.subsectionTitle}>Miembros</Text>
+          {members.length ? (
+            members.map((member) => (
+              <StatRow
+                key={member.userId}
+                label={member.role === "owner" ? "Administrador" : "Miembro"}
+                value={member.displayName}
+              />
+            ))
+          ) : (
+            <Text style={styles.mutedText}>Todavia no hay miembros cargados.</Text>
+          )}
+        </View>
+
+        <View style={styles.inviteBox}>
+          <Text style={styles.subsectionTitle}>Invitacion activa</Text>
+          {activeInvite ? (
+            <>
+              <Text selectable style={styles.inviteCode}>
+                {activeInvite.code}
+              </Text>
+              <Text style={styles.mutedText}>Vence el {formatInviteExpiry(activeInvite.expiresAt)}</Text>
+              <PrimaryButton label="Copiar codigo" onPress={copyInviteCode} variant="secondary" />
+            </>
+          ) : (
+            <Text style={styles.mutedText}>No hay un codigo activo.</Text>
+          )}
+          <PrimaryButton
+            label={activeInvite ? "Crear nuevo codigo" : "Crear codigo de invitacion"}
+            onPress={generateInviteCode}
+            variant="secondary"
+          />
+        </View>
+
+        <PrimaryButton label="Cerrar sesion" onPress={closeSession} variant="danger" />
       </Card>
 
       <Card>
@@ -458,16 +511,64 @@ export function ConfigScreen() {
 }
 
 const styles = StyleSheet.create({
+  accountBox: {
+    backgroundColor: colors.background,
+    borderColor: colors.softBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+    padding: 12
+  },
+  accountLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase"
+  },
+  accountValue: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "900"
+  },
   goalTitle: {
     color: colors.primaryDark,
     fontSize: 14,
     fontWeight: "900",
     marginTop: 4
   },
+  inviteBox: {
+    gap: 8
+  },
+  inviteCode: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.softGreen,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    color: colors.primaryDark,
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  memberList: {
+    gap: 8
+  },
+  mutedText: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20
+  },
   sectionTitle: {
     color: colors.text,
     fontSize: 17,
     fontWeight: "800"
+  },
+  subsectionTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "900"
   },
   warning: {
     color: colors.warning,

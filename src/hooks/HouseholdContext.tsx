@@ -7,12 +7,26 @@ interface Household {
   name: string;
 }
 
+interface HouseholdMember {
+  displayName: string;
+  role: string;
+  userId: string;
+}
+
+interface HouseholdInvite {
+  code: string;
+  expiresAt: string;
+}
+
 interface HouseholdContextValue {
+  activeInvite: HouseholdInvite | null;
   createHousehold: (name: string) => Promise<void>;
   createInviteCode: () => Promise<string>;
   household: Household | null;
+  members: HouseholdMember[];
   isLoading: boolean;
   joinHousehold: (code: string) => Promise<void>;
+  refreshAccountDetails: () => Promise<void>;
   refreshHousehold: () => Promise<void>;
 }
 
@@ -27,12 +41,57 @@ function createCode(): string {
 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
   const { user } = useAuthContext();
+  const [activeInvite, setActiveInvite] = useState<HouseholdInvite | null>(null);
   const [household, setHousehold] = useState<Household | null>(null);
+  const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const refreshAccountDetails = async (householdId = household?.id) => {
+    if (!householdId) {
+      setMembers([]);
+      setActiveInvite(null);
+      return;
+    }
+
+    const [membersResult, inviteResult] = await Promise.all([
+      supabase.from("household_members").select("role, user_id").eq("household_id", householdId).order("role"),
+      supabase
+        .from("household_invites")
+        .select("code, expires_at")
+        .eq("household_id", householdId)
+        .is("used_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ]);
+
+    if (membersResult.error) throw membersResult.error;
+    if (inviteResult.error) throw inviteResult.error;
+
+    const userIds = (membersResult.data ?? []).map((member) => member.user_id);
+    const profilesResult = userIds.length
+      ? await supabase.from("profiles").select("id, display_name").in("id", userIds)
+      : { data: [], error: null };
+
+    if (profilesResult.error) throw profilesResult.error;
+
+    const profileNames = new Map((profilesResult.data ?? []).map((profile) => [profile.id, profile.display_name]));
+    setMembers(
+      (membersResult.data ?? []).map((member) => ({
+        displayName: profileNames.get(member.user_id) ?? (member.user_id === user?.id ? user?.email ?? "Usuario actual" : "Miembro"),
+        role: member.role,
+        userId: member.user_id
+      }))
+    );
+    setActiveInvite(inviteResult.data ? { code: inviteResult.data.code, expiresAt: inviteResult.data.expires_at } : null);
+  };
 
   const refreshHousehold = async () => {
     if (!user) {
       setHousehold(null);
+      setMembers([]);
+      setActiveInvite(null);
       setIsLoading(false);
       return;
     }
@@ -51,7 +110,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     }
 
     const householdData = Array.isArray(data?.households) ? data?.households[0] : data?.households;
-    setHousehold(householdData ? { id: householdData.id, name: householdData.name } : null);
+    const nextHousehold = householdData ? { id: householdData.id, name: householdData.name } : null;
+    setHousehold(nextHousehold);
+    await refreshAccountDetails(nextHousehold?.id);
     setIsLoading(false);
   };
 
@@ -93,6 +154,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     if (settingsError) throw settingsError;
 
     setHousehold({ id: newHousehold.id, name: newHousehold.name });
+    await refreshAccountDetails(newHousehold.id);
   };
 
   const createInviteCode = async (): Promise<string> => {
@@ -107,6 +169,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
     if (error) throw error;
 
+    await refreshAccountDetails();
     return code;
   };
 
@@ -121,14 +184,17 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<HouseholdContextValue>(
     () => ({
+      activeInvite,
       createHousehold,
       createInviteCode,
       household,
+      members,
       isLoading,
       joinHousehold,
+      refreshAccountDetails,
       refreshHousehold
     }),
-    [household, isLoading, user?.id]
+    [activeInvite, household, isLoading, members, user?.id]
   );
 
   return <HouseholdContext.Provider value={value}>{children}</HouseholdContext.Provider>;
