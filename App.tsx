@@ -1,5 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
+import { useCallback, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuthContext } from "./src/hooks/AuthContext";
 import { AppDataProvider } from "./src/hooks/AppDataContext";
@@ -7,6 +8,7 @@ import { HouseholdProvider, useHouseholdContext } from "./src/hooks/HouseholdCon
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { AuthScreen } from "./src/screens/AuthScreen";
 import { HouseholdSetupScreen } from "./src/screens/HouseholdSetupScreen";
+import { WelcomeScreen } from "./src/screens/WelcomeScreen";
 
 function AuthenticatedRoot() {
   const { household, isLoading } = useHouseholdContext();
@@ -51,10 +53,20 @@ function Root() {
 
 // Punto de entrada de la app: envuelve toda la experiencia con navegacion.
 export default function App() {
+  const [isWelcomeVisible, setIsWelcomeVisible] = useState(true);
+  const hideWelcome = useCallback(() => setIsWelcomeVisible(false), []);
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <Root />
+        {isWelcomeVisible ? (
+          <>
+            <StatusBar style="dark" />
+            <WelcomeScreen onFinish={hideWelcome} />
+          </>
+        ) : (
+          <Root />
+        )}
       </AuthProvider>
     </SafeAreaProvider>
   );

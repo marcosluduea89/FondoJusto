@@ -4,18 +4,31 @@
     "slug": "fondojusto",
     "scheme": "fondojusto",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
       "backgroundColor": "#f7f4ee"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.fondojusto.app"
+      "adaptiveIcon": {
+        "backgroundColor": "#e8f4ef",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "package": "com.fondojusto.app",
+      "versionCode": 1
     },
-    "web": {}
+    "web": {},
+    "extra": {
+      "eas": {
+        "projectId": "87d4d45c-d2ee-4060-9dea-326248edd7b7"
+      }
+    }
   }
 }

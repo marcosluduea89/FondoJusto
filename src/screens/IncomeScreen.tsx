@@ -1,4 +1,4 @@
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMemo, useState } from "react";
 import { Card } from "../components/Card";
 import { DateSelector } from "../components/DateSelector";
@@ -6,10 +6,10 @@ import { MonthSelector } from "../components/MonthSelector";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SegmentedControl } from "../components/SegmentedControl";
-import { StatRow } from "../components/StatRow";
 import { TextInputField } from "../components/TextInputField";
 import { useAppDataContext } from "../hooks/AppDataContext";
 import { Income, PersonId } from "../models";
+import { colors } from "../theme/colors";
 import { formatAmountInput, formatARS, parseAmountInput } from "../utils/currency";
 import { getTodayISODate } from "../utils/dates";
 import { createId } from "../utils/ids";
@@ -143,39 +143,114 @@ export function IncomeScreen() {
       </Card>
 
       <Card>
-        <SegmentedControl
-          label="Ingresos del mes"
-          onChange={(incomeId) => {
-            const income = monthIncomes.find((item) => item.id === incomeId);
-            if (income) editIncome(income);
-          }}
-          options={
-            monthIncomes.length
-              ? monthIncomes.map((income) => ({
-                  label: `${income.description} - ${formatARS(income.amount)}`,
-                  value: income.id
-                }))
-              : [{ label: "Sin ingresos", value: "none" }]
-          }
-          value={editingIncomeId ?? "none"}
-        />
-        {monthIncomes.map((income) => (
-          <View key={income.id} style={styles.record}>
-            <StatRow label={`${income.description} (${getPersonName(data?.people, income.personId)})`} value={formatARS(income.amount)} />
-            <PrimaryButton label="Editar" onPress={() => editIncome(income)} variant="secondary" />
-            <PrimaryButton label="Eliminar" onPress={() => removeIncome(income.id)} variant="danger" />
-          </View>
-        ))}
+        <Text style={styles.sectionTitle}>Ingresos del mes</Text>
+        {monthIncomes.length ? (
+          monthIncomes.map((income) => (
+            <View key={income.id} style={[styles.record, editingIncomeId === income.id && styles.activeRecord]}>
+              <View style={styles.recordMain}>
+                <View style={styles.recordText}>
+                  <Text numberOfLines={1} style={styles.recordTitle}>
+                    {income.description}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.recordMeta}>
+                    {getPersonName(data?.people, income.personId)} · {income.date}
+                  </Text>
+                </View>
+                <Text style={styles.recordAmount}>{formatARS(income.amount)}</Text>
+              </View>
+              <View style={styles.actions}>
+                <Pressable accessibilityRole="button" onPress={() => editIncome(income)} style={styles.actionButton}>
+                  <Text style={styles.actionText}>Editar</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => removeIncome(income.id)}
+                  style={[styles.actionButton, styles.deleteButton]}
+                >
+                  <Text style={[styles.actionText, styles.deleteText]}>Eliminar</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.empty}>No hay ingresos cargados para este mes.</Text>
+        )}
       </Card>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  record: {
-    borderTopColor: "#d8ddd7",
-    borderTopWidth: 1,
+  actionButton: {
+    alignItems: "center",
+    backgroundColor: colors.softGreen,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 84,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  actionText: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  actions: {
+    flexDirection: "row",
     gap: 8,
-    paddingTop: 10
+    justifyContent: "flex-end"
+  },
+  activeRecord: {
+    backgroundColor: colors.softGreen,
+    borderColor: colors.primary
+  },
+  deleteButton: {
+    backgroundColor: "#fff4f2",
+    borderColor: colors.danger
+  },
+  deleteText: {
+    color: colors.danger
+  },
+  empty: {
+    color: colors.muted,
+    fontSize: 14
+  },
+  record: {
+    borderColor: colors.softBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 10
+  },
+  recordAmount: {
+    color: colors.text,
+    flexShrink: 0,
+    fontSize: 17,
+    fontWeight: "900"
+  },
+  recordMain: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between"
+  },
+  recordMeta: {
+    color: colors.muted,
+    fontSize: 13
+  },
+  recordText: {
+    flex: 1,
+    gap: 2
+  },
+  recordTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  sectionTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "800"
   }
 });
